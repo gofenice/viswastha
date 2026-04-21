@@ -1,0 +1,61 @@
+@extends('Admin.admin_header')
+@section('title', 'vishwastha | Achiever Details')
+@section('content')
+
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+    <!-- Content Header (Page header) -->
+    <section class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1>Ceiling Achiever Details</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="#">Home</a></li>
+                        <li class="breadcrumb-item active">Achiever Details</li>
+                    </ol>
+                </div>
+            </div>
+        </div><!-- /.container-fluid -->
+    </section>
+
+    <!-- Horizontal Form -->
+    <div class="card card-info col-md-8" style="margin: 0 auto;">
+        <div class="card-header">
+            <h3 class="card-title">Ceiling Achiever Details</h3>
+        </div>
+        <!-- /.card-header -->
+        <!-- form start -->
+        <form class="form-horizontal">
+            <div class="card-body">
+                <div class="form-group row">
+                    <label for="inputEmail3" class="col-sm-3 col-form-label">User Id</label>
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" id="inputEmail3"  placeholder="User Id">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="inputPassword3" class="col-sm-3 col-form-label">From Date</label>
+                    <div class="col-sm-8">
+                        <input type="date" class="form-control" id="inputPassword3" placeholder="Old Password">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="inputPassword3" class="col-sm-3 col-form-label">To Date</label>
+                    <div class="col-sm-8">
+                        <input type="date" class="form-control" id="inputPassword3" placeholder="New Password">
+                    </div>
+                </div>
+            </div>
+            <!-- /.card-body -->
+            <div class="card-footer">
+                <button type="submit" class="btn btn-info float-right">View Details</button>
+            </div>
+            <!-- /.card-footer -->
+        </form>
+    </div>
+    <!-- /.card -->
+</div>
+@endsection
