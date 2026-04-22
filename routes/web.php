@@ -65,6 +65,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/pin_request_details', [AdminController::class, 'pin_request_details'])->name('pin_request_details');
     Route::get('/binary_income_details', [AdminController::class, 'binary_income_details'])->name('binary_income_details');
 
+    // User binary tree (post-migration)
+    Route::get('/my-tree', [AdminController::class, 'userBinaryTree'])->name('user.binary_tree');
+
     // Binary Tree Admin Migration
     Route::get('/admin/binary-tree', [AdminController::class, 'binaryTreeAdmin'])->name('admin.binary_tree');
     Route::post('/admin/binary-tree/set-root', [AdminController::class, 'setBinaryRoot'])->name('admin.binary_tree.set_root');
@@ -72,9 +75,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/admin/binary-tree/remove-user', [AdminController::class, 'removeFromBinaryTree'])->name('admin.binary_tree.remove_user');
     Route::get('/admin/binary-tree/search-users', [AdminController::class, 'searchUsersForTransfer'])->name('admin.binary_tree.search_users');
     Route::get('/admin/binary-tree/check-slots', [AdminController::class, 'checkTargetSlots'])->name('admin.binary_tree.check_slots');
+    Route::get('/admin/binary-tree/pin-owners', [AdminController::class, 'getPinOwners'])->name('admin.binary_tree.pin_owners');
     Route::get('/admin/binary-tree/user-packages', [AdminController::class, 'getUserPackageDetails'])->name('admin.binary_tree.user_packages');
     Route::post('/admin/binary-tree/move-user', [AdminController::class, 'moveUserInTree'])->name('admin.binary_tree.move_user');
     Route::post('/admin/binary-tree/complete-migration', [AdminController::class, 'completeMigration'])->name('admin.binary_tree.complete_migration');
+    Route::post('/admin/binary-tree/quick-user', [AdminController::class, 'quickTestUser'])->name('admin.binary_tree.quick_user');
+    Route::get('/admin/binary-tree/leg-volume-detail', [AdminController::class, 'binaryLegVolumeDetail'])->name('admin.binary_tree.leg_volume_detail');
+    Route::get('/admin/binary-income', [AdminController::class, 'adminBinaryIncome'])->name('admin.binary_income');
+    Route::get('/admin/binary-income/popup', [AdminController::class, 'adminBinaryIncomePopup'])->name('admin.binary_income.popup');
+    Route::get('/admin/binary-income/run', [AdminController::class, 'runBinaryIncome'])->name('admin.binary_income.run');
+    Route::post('/admin/binary-income/clear-wallets', [AdminController::class, 'clearBinaryWallets'])->name('admin.binary_income.clear_wallets');
     Route::get('/directy_income_details', [AdminController::class, 'directy_income_details'])->name('directy_income_details');
     Route::get('/royalty_income_details', [AdminController::class, 'royalty_income_details'])->name('royalty_income_details');
     Route::get('/package', [AdminController::class, 'package'])->name('package');

@@ -12,6 +12,9 @@ class Package extends Model
     protected $fillable = [
         'name',
         'amount',
+        'binary_commission',
+        'sponsor_commission',
+        'daily_pair_cap',
         'package_code',
         'package_cat',
         'status',

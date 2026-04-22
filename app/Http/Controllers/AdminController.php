@@ -72,6 +72,10 @@ use Illuminate\Support\Facades\Storage;
 
 class AdminController extends Controller
 {
+    /** Date from which binary tree packages count (skip sunflower-era activations) */
+    private string $binaryStartDate = '2026-04-20';
+
+
     public function login()
     {
         return view('Admin/login');
@@ -151,7 +155,200 @@ class AdminController extends Controller
     }
     public function binary_income_details()
     {
-        return view('Admin/binary_income_details');
+        $user = auth()->user();
+        if (in_array($user->role, ['admin', 'superadmin'])) {
+            return $this->adminBinaryIncome(request());
+        }
+        return $this->binaryIncomeUser();
+    }
+
+    public function adminBinaryIncome(Request $request)
+    {
+        $fromDate = $request->get('from_date', \Carbon\Carbon::today()->toDateString());
+        $toDate   = $request->get('to_date',   \Carbon\Carbon::today()->toDateString());
+        $userId   = $request->get('user_id');
+
+        $query = \App\Models\BinaryPairLog::with('user', 'package')
+            ->whereBetween('calc_date', [$fromDate, $toDate])
+            ->where('income', '>', 0)
+            ->orderBy('calc_date', 'desc')
+            ->orderBy('user_id');
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        $logs = $query->get();
+
+        // Latest carry-forward per user per package
+        $packageStatus = \DB::table('binary_pair_logs as bpl')
+            ->join('packages as p', 'p.id', '=', 'bpl.package_id')
+            ->join('users as u', 'u.id', '=', 'bpl.user_id')
+            ->whereIn('bpl.id', function ($q) {
+                $q->selectRaw('MAX(id)')
+                  ->from('binary_pair_logs')
+                  ->groupBy('user_id', 'package_id');
+            })
+            ->select(
+                'u.id as user_id', 'u.name', 'u.connection',
+                'p.name as package_name',
+                'bpl.carry_out_left', 'bpl.carry_out_right',
+                'bpl.capped_pairs', 'bpl.income as last_income',
+                'bpl.created_at as last_run'
+            )
+            ->orderBy('u.connection')
+            ->get();
+
+        // Per-user wallet summary with income split
+        $userSummary = \DB::table('binary_wallets as bw')
+            ->join('users as u', 'u.id', '=', 'bw.user_id')
+            ->leftJoinSub(
+                \DB::table('binary_transactions')
+                    ->select('user_id', \DB::raw('SUM(amount) as pair_total'))
+                    ->where('type', 'binary_pair')
+                    ->groupBy('user_id'),
+                'pt', 'pt.user_id', '=', 'bw.user_id'
+            )
+            ->leftJoinSub(
+                \DB::table('binary_transactions')
+                    ->select('user_id', \DB::raw('SUM(amount) as sponsor_total'))
+                    ->whereIn('type', ['binary_sponsor', 'prime_sponsor'])
+                    ->groupBy('user_id'),
+                'st', 'st.user_id', '=', 'bw.user_id'
+            )
+            ->select(
+                'u.id', 'u.name', 'u.connection',
+                'bw.balance', 'bw.carry_forward_left', 'bw.carry_forward_right',
+                \DB::raw('COALESCE(pt.pair_total, 0) as pair_income'),
+                \DB::raw('COALESCE(st.sponsor_total, 0) as sponsor_income')
+            )
+            ->where(function ($q) {
+                $q->where('bw.total_earned', '>', 0)
+                  ->orWhere('bw.carry_forward_left', '>', 0)
+                  ->orWhere('bw.carry_forward_right', '>', 0);
+            })
+            ->orderBy('u.connection')
+            ->get();
+
+        return view('Admin/binary_income_details', compact('logs', 'fromDate', 'toDate', 'userId', 'packageStatus', 'userSummary'));
+    }
+
+    public function adminBinaryIncomePopup(Request $request)
+    {
+        $log = \App\Models\BinaryPairLog::with('user')
+            ->where('user_id', $request->user_id)
+            ->where('calc_date', $request->date)
+            ->first();
+
+        if (!$log) {
+            return response()->json(['error' => 'No record found'], 404);
+        }
+
+        $wallet = \App\Models\BinaryWallet::where('user_id', $log->user_id)->first();
+
+        return response()->json([
+            'log'    => $log,
+            'wallet' => $wallet,
+        ]);
+    }
+
+    public function binaryLegVolumeDetail(Request $request)
+    {
+        $userId      = (int) $request->input('user_id');
+        $side        = $request->input('side');          // 'left' or 'right'
+        $packageCode = $request->input('package_code'); // 'basic_package' or 'premium_package'
+
+        if (!$userId || !in_array($side, ['left', 'right']) || !$packageCode) {
+            return response()->json(['error' => 'Invalid parameters'], 422);
+        }
+
+        $child = User::where('parent_id', $userId)->where('position', $side)->value('id');
+        if (!$child) {
+            return response()->json(['rows' => [], 'total_bv' => 0]);
+        }
+
+        $rows = \DB::select("
+            WITH RECURSIVE subtree AS (
+                SELECT id FROM users WHERE id = ?
+                UNION ALL
+                SELECT u.id FROM users u
+                INNER JOIN subtree s ON u.parent_id = s.id
+            )
+            SELECT u.id, u.name, u.connection, p.name AS package_name,
+                   p.binary_commission AS bv, up.created_at AS activated_at
+            FROM user_packages up
+            JOIN packages p ON p.id = up.package_id
+            JOIN users u    ON u.id = up.user_id
+            WHERE up.user_id IN (SELECT id FROM subtree)
+              AND up.status = 1
+              AND up.created_at >= ?
+              AND p.package_code = ?
+            ORDER BY up.created_at DESC
+        ", [$child, $this->binaryStartDate, $packageCode]);
+
+        $totalBv = array_sum(array_column($rows, 'bv'));
+
+        return response()->json([
+            'rows'     => $rows,
+            'total_bv' => $totalBv,
+        ]);
+    }
+
+    public function runBinaryIncome(Request $request)
+    {
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('binary:calculate');
+        $output   = \Illuminate\Support\Facades\Artisan::output();
+
+        return redirect()->route('admin.binary_income')
+            ->with('run_result', [
+                'status' => $exitCode === 0 ? 'success' : 'error',
+                'output' => trim($output),
+            ]);
+    }
+
+    public function clearBinaryWallets(Request $request)
+    {
+        \DB::table('binary_pair_logs')->truncate();
+        \DB::table('binary_transactions')->truncate();
+        \DB::table('binary_wallets')->update([
+            'balance'             => 0,
+            'total_earned'        => 0,
+            'total_withdrawn'     => 0,
+            'carry_forward_left'  => 0,
+            'carry_forward_right' => 0,
+        ]);
+
+        return redirect()->route('admin.binary_income')
+            ->with('run_result', [
+                'date'   => null,
+                'status' => 'success',
+                'output' => 'All binary wallets, transactions and pair logs cleared.',
+            ]);
+    }
+
+    public function binaryIncomeUser()
+    {
+        $userId    = auth()->id();
+        $yesterday = \Carbon\Carbon::yesterday()->toDateString();
+
+        $pairLogs = \App\Models\BinaryPairLog::with('package')
+            ->where('user_id', $userId)
+            ->orderBy('calc_date', 'desc')
+            ->get();
+
+        $referralTransactions = \App\Models\BinaryTransaction::where('user_id', $userId)
+            ->whereIn('type', ['binary_sponsor', 'prime_sponsor'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $wallet           = \App\Models\BinaryWallet::where('user_id', $userId)->first();
+        $pairIncomeTotal  = $pairLogs->sum('income');
+        $sponsorIncomeTotal = $referralTransactions->sum('amount');
+
+        return view('Admin/binary_income_user', compact(
+            'pairLogs', 'referralTransactions', 'wallet', 'yesterday',
+            'pairIncomeTotal', 'sponsorIncomeTotal'
+        ));
     }
     public function directy_income_details()
     {
@@ -171,37 +368,48 @@ class AdminController extends Controller
     public function add_package(Request $request)
     {
         $validated = $request->validate([
-            'packageName' => ['required', 'string', 'max:255'],
-            'packageAmount' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],
-            'status' => 'required|boolean',
-            'packageCategory' => 'required',
-            'packageCat' => 'required',
+            'packageName'        => ['required', 'string', 'max:255'],
+            'packageAmount'      => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],
+            'binary_commission'  => ['required', 'numeric', 'min:0'],
+            'sponsor_commission' => ['required', 'numeric', 'min:0'],
+            'daily_pair_cap'     => ['required', 'integer', 'min:0'],
+            'status'             => 'required|boolean',
+            'packageCategory'    => 'required',
+            'packageCat'         => 'required',
         ]);
         Package::create([
-            'name' => $validated['packageName'],
-            'amount' => $validated['packageAmount'],
-            'package_code' => $validated['packageCategory'],
-            'package_cat' => $validated['packageCat'],
-            'status' => $validated['status'],
+            'name'               => $validated['packageName'],
+            'amount'             => $validated['packageAmount'],
+            'binary_commission'  => $validated['binary_commission'],
+            'sponsor_commission' => $validated['sponsor_commission'],
+            'daily_pair_cap'     => $validated['daily_pair_cap'],
+            'package_code'       => $validated['packageCategory'],
+            'package_cat'        => $validated['packageCat'],
+            'status'             => $validated['status'],
         ]);
         return redirect()->route('package')->with('success', 'Added Package Successfully.');
     }
+
     public function edit_package(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'amount' => 'required|numeric',
-            'status' => 'required|boolean',
+            'name'               => 'required|string|max:255',
+            'amount'             => 'required|numeric',
+            'binary_commission'  => 'required|numeric|min:0',
+            'sponsor_commission' => 'required|numeric|min:0',
+            'daily_pair_cap'     => 'required|integer|min:0',
+            'status'             => 'required|boolean',
         ]);
-        $packageId = $request->input('id');
-        $package = Package::findOrFail($packageId);
+        $package = Package::findOrFail($request->input('id'));
         $package->update([
-            'name' => $validated['name'],
-            'amount' => $validated['amount'],
-            'package_code' => $validated['name'],
-            'status' => $validated['status'],
+            'name'               => $validated['name'],
+            'amount'             => $validated['amount'],
+            'binary_commission'  => $validated['binary_commission'],
+            'sponsor_commission' => $validated['sponsor_commission'],
+            'daily_pair_cap'     => $validated['daily_pair_cap'],
+            'status'             => $validated['status'],
         ]);
-        return redirect()->route('package')->with('successchange', 'Added Package Successfully.');
+        return redirect()->route('package')->with('successchange', 'Package updated successfully.');
     }
     public function delete_package(Request $request)
     {
@@ -1238,32 +1446,41 @@ class AdminController extends Controller
 
     public function getAvailablePins(Request $request)
     {
-        $packageId = $request->input('package_id');
-        $authUser  = auth()->user();
+        $packageId  = $request->input('package_id');
+        $authUser   = auth()->user();
+        $isAdmin    = in_array($authUser->role, ['admin', 'superadmin']);
 
-        // If a target user is specified (admin activating for someone),
-        // use that user's sponsor's pins — the sponsor owns the pins to activate.
-        if ($request->filled('user_id')) {
-            $targetUser = User::find((int) $request->input('user_id'));
-            $userId     = $targetUser && $targetUser->sponsor_id
-                            ? $targetUser->sponsor_id
-                            : $authUser->id;
+        if ($isAdmin && $request->filled('user_id') && $request->filled('target_user_id')) {
+            // Verify the requested pin owner is the target user or one of their ancestors
+            $pinOwnerId   = (int) $request->input('user_id');
+            $targetUserId = (int) $request->input('target_user_id');
+
+            $allowed = [];
+            $node = User::find($targetUserId);
+            while ($node) {
+                $allowed[] = $node->id;
+                $node = $node->parent_id ? User::find($node->parent_id) : null;
+            }
+
+            if (!in_array($pinOwnerId, $allowed)) {
+                return response()->json(['pins' => [], 'products' => [], 'error' => 'Pin owner not allowed for this user.']);
+            }
         } else {
-            $userId = $authUser->id;
+            // Regular user or fallback: use their own pins
+            $pinOwnerId = $authUser->id;
         }
 
-        // Fetch available pins for the sponsor and package
-        $pins = PinGeneration::where('user_id', $userId)
-            ->where('package_id', $packageId)
+        $pins = PinGeneration::where('package_id', $packageId)
             ->where('used', '0')
-            ->get(['id', 'unique_id']);
+            ->where('user_id', $pinOwnerId)
+            ->get(['id', 'unique_id'])
+            ->map(fn($p) => ['id' => $p->id, 'unique_id' => $p->unique_id]);
 
         $products = Product::where('package_id', $packageId)
             ->where('product_status', 1)
             ->get(['id', 'product_name']);
 
-
-        return response()->json(['pins' => $pins, 'products' => $products,]);
+        return response()->json(['pins' => $pins, 'products' => $products]);
     }
 
     public function updatePin(Request $request)
@@ -1334,6 +1551,7 @@ class AdminController extends Controller
         $this->updateSponsorLevels($request->userid, $request->package_id);
         $referralIncome = $this->addReferralIncome($request->userid, $request->package_id);
         $this->royaltyIncomeAdd($request->userid, $request->package_id);
+        // Credit sponsor commission if configured on the package (dynamic, package-code-agnostic)
         $this->creditBinarySponsorIncome($request->userid, $request->package_id);
 
         // $calculationController = new CalculationController();
@@ -1551,7 +1769,9 @@ class AdminController extends Controller
 
         // Redirect back to binary tree if request came from there, otherwise sunflower
         if (str_contains(request()->headers->get('referer', ''), 'binary-tree')) {
-            return redirect()->route('admin.binary_tree')->with('success', 'Package activated successfully.');
+            $nodeId = $request->input('node_id');
+            $redirectUrl = route('admin.binary_tree') . ($nodeId ? '?node_id=' . (int) $nodeId : '');
+            return redirect($redirectUrl)->with('success', 'Package activated successfully.');
         }
 
         return redirect()->route('sunflower')->with('success', 'Package activation and product ordering were completed successfully.');
@@ -5778,6 +5998,45 @@ class AdminController extends Controller
         return redirect()->back()->with('error', 'Member not found.');
     }
 
+    // ── User Binary Tree (post-migration) ────────────────────────────────────────
+
+    public function userBinaryTree(Request $request)
+    {
+        $settings = BinaryTreeSetting::current();
+
+        if (!$settings->migration_complete) {
+            return redirect()->route('sunflower')->with('info', 'Binary tree is not yet available.');
+        }
+
+        $me          = auth()->user();
+        $nodeId      = $request->query('node_id');
+        $currentNode = $nodeId ? User::find($nodeId) : $me;
+
+        // Users can only browse within their own subtree
+        if ($currentNode && $currentNode->id !== $me->id) {
+            // Verify currentNode is a descendant of the logged-in user
+            $node = $currentNode;
+            $isDescendant = false;
+            while ($node && $node->parent_id) {
+                if ($node->parent_id == $me->id) { $isDescendant = true; break; }
+                $node = User::find($node->parent_id);
+                if ($node && $node->id == $me->id) { $isDescendant = true; break; }
+            }
+            if (!$isDescendant) $currentNode = $me;
+        }
+
+        $binaryTree = $this->buildBinaryTreeData($currentNode, 4);
+        $parentNode = ($currentNode && $currentNode->id !== $me->id && $currentNode->parent_id)
+            ? User::find($currentNode->parent_id)
+            : null;
+
+        $packages = \App\Models\Package::where('status', 1)->orderBy('name')->get();
+
+        return view('Admin.binary_tree_user', compact(
+            'currentNode', 'binaryTree', 'parentNode', 'packages', 'me'
+        ));
+    }
+
     // ── Binary Tree Admin Migration ──────────────────────────────────────────────
 
     public function binaryTreeAdmin(Request $request)
@@ -5905,6 +6164,25 @@ class AdminController extends Controller
      * Check which slots (left/right) are available under a target user.
      * Also validates that the target is not a descendant of the user being moved.
      */
+    public function getPinOwners(Request $request)
+    {
+        $user = User::find((int) $request->user_id);
+        if (!$user) return response()->json([]);
+
+        // Walk up the binary tree parent chain
+        $owners = [];
+        $current = $user;
+        while ($current) {
+            $owners[] = [
+                'id'   => $current->id,
+                'label' => $current->connection . ' — ' . $current->name . ($current->id === $user->id ? ' (Self)' : ''),
+            ];
+            $current = $current->parent_id ? User::find($current->parent_id) : null;
+        }
+
+        return response()->json($owners);
+    }
+
     public function checkTargetSlots(Request $request)
     {
         $targetId  = $request->get('target_id');
@@ -5993,6 +6271,7 @@ class AdminController extends Controller
 
     /**
      * PSV — package value of the direct child on one side only (1 level).
+     * Only counts packages activated on or after the binary launch date.
      */
     private function legDirectVolume(int $userId, string $side): float
     {
@@ -6003,11 +6282,41 @@ class AdminController extends Controller
             ->join('packages', 'packages.id', '=', 'user_packages.package_id')
             ->where('user_packages.user_id', $child)
             ->where('user_packages.status', 1)
+            ->where('user_packages.created_at', '>=', $this->binaryStartDate)
             ->sum('packages.amount');
     }
 
     /**
+     * BV for one leg = SUM of packages.binary_commission for all activations in the subtree.
+     * Only counts packages on/after binary launch date.
+     */
+    private function legVolumeByPackageCode(int $userId, string $side, string $packageCode): float
+    {
+        $child = User::where('parent_id', $userId)->where('position', $side)->value('id');
+        if (!$child) return 0;
+
+        $result = \DB::select("
+            WITH RECURSIVE subtree AS (
+                SELECT id FROM users WHERE id = ?
+                UNION ALL
+                SELECT u.id FROM users u
+                INNER JOIN subtree s ON u.parent_id = s.id
+            )
+            SELECT COALESCE(SUM(p.binary_commission), 0) AS total
+            FROM user_packages up
+            JOIN packages p ON p.id = up.package_id
+            WHERE up.user_id IN (SELECT id FROM subtree)
+              AND up.status = 1
+              AND up.created_at >= ?
+              AND p.package_code = ?
+        ", [$child, $this->binaryStartDate, $packageCode]);
+
+        return (float) ($result[0]->total ?? 0);
+    }
+
+    /**
      * BSV — total package value of the entire subtree on one side using recursive CTE.
+     * Only counts packages activated on or after the binary launch date.
      */
     private function legTotalVolume(int $userId, string $side): float
     {
@@ -6026,7 +6335,8 @@ class AdminController extends Controller
             JOIN packages p ON p.id = up.package_id
             WHERE up.user_id IN (SELECT id FROM subtree)
               AND up.status = 1
-        ", [$child]);
+              AND up.created_at >= ?
+        ", [$child, $this->binaryStartDate]);
 
         return (float) ($result[0]->total ?? 0);
     }
@@ -6066,14 +6376,11 @@ class AdminController extends Controller
 
         $sponsorId = $activatedUser->parent_id;
 
-        [$amount, $type, $label] = match ($package->package_code) {
-            'basic_package'   => [200,  'binary_sponsor', 'Binary sponsor — Basic package activated by ' . $activatedUser->name],
-            'premium_package' => [1000, 'binary_sponsor', 'Binary sponsor — Premium package activated by ' . $activatedUser->name],
-            'prime_package'   => [500,  'prime_sponsor',  'Prime sponsor — Prime package activated by ' . $activatedUser->name],
-            default           => [0, '', ''],
-        };
-
+        $amount = (float) $package->sponsor_commission;
         if ($amount <= 0) return;
+
+        $type  = in_array($package->package_code, ['prime_package']) ? 'prime_sponsor' : 'binary_sponsor';
+        $label = 'Sponsor commission — ' . $package->name . ' activated by ' . $activatedUser->name;
 
         \App\Models\BinaryTransaction::credit(
             $sponsorId,
@@ -6133,6 +6440,64 @@ class AdminController extends Controller
         return response()->json($users);
     }
 
+    public function quickTestUser(Request $request)
+    {
+        $parentId = (int) $request->parent_id;
+        $position = in_array($request->position, ['left', 'right']) ? $request->position : 'left';
+
+        $binaryParent = User::find($parentId);
+        if (!$binaryParent) {
+            return response()->json(['status' => 'error', 'message' => 'Parent not found.']);
+        }
+
+        // Check slot is free
+        if (User::where('parent_id', $parentId)->where('position', $position)->exists()) {
+            return response()->json(['status' => 'error', 'message' => 'Slot already occupied.']);
+        }
+
+        $names     = ['Arun','Biju','Celin','Devi','Ebin','Faisal','Geetha','Hari','Indu','Joji','Kavya','Lijo','Meera','Nisha','Omar'];
+        $surnames  = ['Kumar','Thomas','Jose','Nair','George','Mathew','Varghese','Pillai','Menon','Das'];
+        $firstName = $names[array_rand($names)];
+        $lastName  = $surnames[array_rand($surnames)];
+        $fullName  = $firstName . ' ' . $lastName;
+
+        $lastUser   = User::latest('id')->first();
+        $uniqueId   = $lastUser->id + 1;
+        $initials   = strtoupper(substr(preg_replace('/\s+/', '', $fullName), 0, 2));
+        $connection = 'V' . $initials . $uniqueId;
+        $password   = 'Test@' . rand(1000, 9999);
+
+        // Default sponsor: root user or parent's sponsor
+        $sponsorId = $binaryParent->sponsor_id ?? $binaryParent->id;
+
+        $user = User::create([
+            'name'          => $fullName,
+            'email'         => strtolower($firstName) . $uniqueId . '@test.com',
+            'phone_no'      => '9' . rand(100000000, 999999999),
+            'pan_card_no'   => 'STORE',
+            'pincode'       => '682001',
+            'address'       => 'Test Address',
+            'password'      => Hash::make($password),
+            'sponsor_id'    => $sponsorId,
+            'rank_id'       => 1,
+            'parent_id'     => $parentId,
+            'position'      => $position,
+            'level'         => ($binaryParent->level ?? 0) + 1,
+            'connection'    => $connection,
+            'total_income'  => 0,
+            'role'          => 'user',
+            'mother_id'     => 1,
+            'is_pair_matched' => '0',
+        ]);
+
+        return response()->json([
+            'status'     => 'success',
+            'connection' => $connection,
+            'password'   => $password,
+            'user_id'    => $user->id,
+        ]);
+    }
+
     public function completeMigration(Request $request)
     {
         $settings = BinaryTreeSetting::current();
@@ -6160,11 +6525,11 @@ class AdminController extends Controller
         // Flag: this node has children that are hidden because depth limit reached
         $user->has_more = ($depth === 1) && ($left || $right);
 
-        // PSV / BSV per leg (only users with active packages = "new" binary users)
-        $user->left_psv  = $this->legDirectVolume($user->id, 'left');
-        $user->left_bsv  = $this->legTotalVolume($user->id, 'left');
-        $user->right_psv = $this->legDirectVolume($user->id, 'right');
-        $user->right_bsv = $this->legTotalVolume($user->id, 'right');
+        // Basic and Premium BV per leg (SUM of binary_commission, cutoff: binary launch date)
+        $user->left_basic_vol    = $this->legVolumeByPackageCode($user->id, 'left',  'basic_package');
+        $user->left_premium_vol  = $this->legVolumeByPackageCode($user->id, 'left',  'premium_package');
+        $user->right_basic_vol   = $this->legVolumeByPackageCode($user->id, 'right', 'basic_package');
+        $user->right_premium_vol = $this->legVolumeByPackageCode($user->id, 'right', 'premium_package');
 
         // Resolve package type for profile ring color
         $codes = \App\Models\UserPackage::where('user_packages.user_id', $user->id)

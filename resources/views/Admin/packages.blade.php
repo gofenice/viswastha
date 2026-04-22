@@ -62,6 +62,39 @@
                         </div>
                     </div>
                     <div class="form-group row">
+                        <label for="binary_commission" class="col-sm-4 col-form-label">Binary Commission (BV)</label>
+                        <div class="col-sm-8">
+                            <input type="number" step="0.01" min="0" class="form-control" id="binary_commission" name="binary_commission"
+                                placeholder="BV points per activation (e.g. 200)" required>
+                            <small class="text-muted">Points added to parent's leg BSV/PSV per activation</small>
+                            @error('binary_commission')
+                                <span class="text-danger">{{ $message }}</span>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label for="sponsor_commission" class="col-sm-4 col-form-label">Sponsor Commission (₹)</label>
+                        <div class="col-sm-8">
+                            <input type="number" step="0.01" min="0" class="form-control" id="sponsor_commission" name="sponsor_commission"
+                                placeholder="₹ credited to direct sponsor (e.g. 50)" required>
+                            <small class="text-muted">Fixed ₹ amount credited to direct sponsor on activation</small>
+                            @error('sponsor_commission')
+                                <span class="text-danger">{{ $message }}</span>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label for="daily_pair_cap" class="col-sm-4 col-form-label">Daily Pair Cap</label>
+                        <div class="col-sm-8">
+                            <input type="number" min="0" step="1" class="form-control" id="daily_pair_cap" name="daily_pair_cap"
+                                placeholder="Max pairs per day (e.g. 25)" required>
+                            <small class="text-muted">Maximum pair matches allowed per day for this package</small>
+                            @error('daily_pair_cap')
+                                <span class="text-danger">{{ $message }}</span>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="form-group row">
                         <label for="packageCategory" class="col-sm-4 col-form-label">Category</label>
                         <div class="col-sm-8">
                             <select class="form-control" id="packageCategory" name="packageCategory" required>
@@ -115,8 +148,11 @@
                         <tr>
                             <th>Package Name</th>
                             <th>Amount</th>
+                            <th>Binary BV</th>
+                            <th>Sponsor ₹</th>
+                            <th>Daily Cap</th>
                             <th>Category</th>
-                            <th>Active/Incative</th>
+                            <th>Active/Inactive</th>
                             <th>Type</th>
                             <th>Actions</th>
                         </tr>
@@ -126,14 +162,16 @@
                             @foreach ($packages as $package)
                                 <tr>
                                     <td>{{ $package->name }}</td>
-                                    <td>{{ $package->amount }}</td>
+                                    <td>₹{{ number_format($package->amount, 2) }}</td>
+                                    <td>{{ number_format($package->binary_commission, 2) }}</td>
+                                    <td>₹{{ number_format($package->sponsor_commission, 2) }}</td>
+                                    <td>{{ $package->daily_pair_cap }}</td>
                                     <td>
                                         @if ($package->package_code == 'basic_package')
                                             Basic Package
                                         @else
-                                            Premium package
+                                            Premium Package
                                         @endif
-
                                     </td>
                                     <td>{{ $package->status ? 'Active' : 'Inactive' }}</td>
                                     <td>
@@ -142,12 +180,11 @@
                                         @else
                                             Premium
                                         @endif
-
                                     </td>
                                     <td>
                                         <button class="btn btn-success btn-sm" data-toggle="modal"
                                             data-target="#editPackageModal"
-                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}')">
+                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}', '{{ $package->binary_commission }}', '{{ $package->sponsor_commission }}', '{{ $package->daily_pair_cap }}')">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         {{-- <button class="btn btn-danger btn-sm" data-toggle="modal"
@@ -182,12 +219,26 @@
                             <div class="form-group">
                                 <input type="hidden" class="form-control" id="packageId" name="id">
                                 <label for="editName">Package Name</label>
-                                <input type="text" class="form-control" id="editName" name="name" required
-                                    readonly>
+                                <input type="text" class="form-control" id="editName" name="name" required readonly>
                             </div>
                             <div class="form-group">
-                                <label for="editAmount">Amount</label>
-                                <input type="number" class="form-control" id="editAmount" name="amount" required>
+                                <label for="editAmount">Amount (₹)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="editAmount" name="amount" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editBinaryCommission">Binary Commission (BV)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="editBinaryCommission" name="binary_commission" required>
+                                <small class="text-muted">BV points added to parent's leg per activation</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="editSponsorCommission">Sponsor Commission (₹)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="editSponsorCommission" name="sponsor_commission" required>
+                                <small class="text-muted">₹ credited to direct sponsor on activation</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="editDailyPairCap">Daily Pair Cap</label>
+                                <input type="number" min="0" step="1" class="form-control" id="editDailyPairCap" name="daily_pair_cap" required>
+                                <small class="text-muted">Maximum pair matches allowed per day</small>
                             </div>
                             <div class="form-group">
                                 <label>Status</label><br>
@@ -245,21 +296,18 @@
         </script>
     @endif
     <script>
-        function editPackage(id, name, amount, status) {
-            var packageId = $('#editPackageModal').find('#packageId');
-            packageId.val(id);
-            var packageNameIdField = $('#editPackageModal').find('#editName');
-            packageNameIdField.val(name);
-            var packageAmountIdField = $('#editPackageModal').find('#editAmount');
-            packageAmountIdField.val(amount);
-            var packageStatusIdField = $('#editPackageModal').find('#status');
-            packageStatusIdField.prop('checked', false);
+        function editPackage(id, name, amount, status, binaryCommission, sponsorCommission, dailyPairCap) {
+            $('#editPackageModal #packageId').val(id);
+            $('#editPackageModal #editName').val(name);
+            $('#editPackageModal #editAmount').val(amount);
+            $('#editPackageModal #editBinaryCommission').val(binaryCommission);
+            $('#editPackageModal #editSponsorCommission').val(sponsorCommission);
+            $('#editPackageModal #editDailyPairCap').val(dailyPairCap);
             if (status == 1) {
-                $('#editPackageModal').find('#status_active').prop('checked', true);
+                $('#editPackageModal #status_active').prop('checked', true);
             } else {
-                $('#editPackageModal').find('#status_inactive').prop('checked', true);
+                $('#editPackageModal #status_inactive').prop('checked', true);
             }
-            $('#editPackageForm .error-message').text("");
             $('#editPackageModal').modal('toggle');
         }
 

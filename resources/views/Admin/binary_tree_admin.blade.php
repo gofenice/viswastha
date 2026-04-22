@@ -1,6 +1,8 @@
 @extends('Admin.admin_header')
 @section('title', 'VISHWASTHA | Binary Tree Migration')
 @section('content')
+<link rel="stylesheet" href="{{ asset('assets/plugins/select2/css/select2.min.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
 
 <style>
 .binary-page-wrapper {
@@ -86,11 +88,13 @@
 
 .node-id   { font-size: 36px; color: #007bff; font-weight: 700; margin-bottom: 6px; }
 .node-name { font-size: 43px; color: #222; font-weight: 600; margin-bottom: 12px; word-break: break-word; line-height: 1.35; }
-.node-lr   { font-size: 38px; color: #555; margin-bottom: 10px; display: flex; justify-content: center; gap: 16px; }
-.node-lr span { background: #e9ecef; border-radius: 5px; padding: 4px 16px; font-size: 38px; }
-.node-leg  { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.node-vol  { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.node-vol small { font-size: 38px; color: #555; font-weight: 600; line-height: 1.4; }
+.node-lr   { font-size: 34px; color: #555; margin-bottom: 6px; display: flex; justify-content: center; gap: 18px; }
+.node-lr .leg-side { font-weight: 700; font-size: 36px; margin-bottom: 2px; }
+.node-lr .leg-basic   { color: #856404; background: #fff3cd; border-radius: 4px; padding: 2px 10px; font-size: 32px; }
+.node-lr .leg-premium { color: #155724; background: #d4edda; border-radius: 4px; padding: 2px 10px; font-size: 32px; }
+.node-leg    { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.leg-clickable { cursor: pointer; text-decoration: underline dotted; transition: opacity .15s; }
+.leg-clickable:hover { opacity: .75; }
 
 /* ── Node action icons ── */
 .node-actions {
@@ -456,8 +460,23 @@
                     <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted small mb-3">Activating for: <strong id="pkgUserName">-</strong></p>
                     <input type="hidden" id="pkgUserId" name="userid">
+                    <input type="hidden" id="pkgNodeId" name="node_id">
+
+                    <p class="mb-2">Activating for: <strong id="pkgUserName">-</strong></p>
+
+                    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin')
+                    {{-- Admin: choose whose pin to use --}}
+                    <div class="form-group">
+                        <label>Use pin from <span class="text-danger">*</span></label>
+                        <select class="form-control" id="pkgPinOwnerDropdown">
+                            <option value="">-- Select pin owner --</option>
+                            @foreach($allUsers as $u)
+                                <option value="{{ $u->id }}">{{ $u->connection }} — {{ $u->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
 
                     {{-- Current packages --}}
                     <div id="pkgCurrentSection" class="mb-3" style="display:none;">
@@ -465,7 +484,7 @@
                         <div id="pkgCurrentList"></div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="pkgPackageSection" @if(auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin') style="display:none;" @endif>
                         <label>Select Package</label>
                         <select class="form-control" id="pkgPackageId" name="package_id" required>
                             <option value="">-- Choose Package --</option>
@@ -474,13 +493,13 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="pkgPinSection" style="display:none;">
                         <label>Available Pins</label>
                         <select class="form-control" id="pkgPinId" name="pin_id" required>
                             <option value="">-- Select package first --</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="pkgProductSection" style="display:none;">
                         <label>Select Product</label>
                         <select class="form-control" id="pkgProductId" name="product_id" required>
                             <option value="">-- Select package first --</option>
@@ -537,7 +556,21 @@
 @endsection
 
 @section('footer')
+<script src="{{ asset('assets/plugins/select2/js/select2.min.js') }}"></script>
 <script>
+// ── Select2 for user dropdown in package modal ────────────────────────────────
+@if(auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin')
+$(function () {
+    $('#pkgPinOwnerDropdown').select2({
+        theme: 'bootstrap4',
+        placeholder: '-- Search by name or ID --',
+        allowClear: true,
+        dropdownParent: $('#packageModal'),
+        width: '100%',
+    });
+});
+@endif
+
 // ── Tree data from server ─────────────────────────────────────────────────────
 const RAW_TREE = @json($binaryTree);
 
@@ -661,12 +694,14 @@ function renderBinaryTree() {
                 '<div class="node-name">' + (n.user.name || '')       + '</div>' +
                 '<div class="node-lr">' +
                     '<div class="node-leg">' +
-                        '<span>L: ' + (n.user.left_count ?? 0) + '</span>' +
-                        '<div class="node-vol"><small>PSV: ₹' + (n.user.left_psv  ?? 0) + '</small><small>BSV: ₹' + (n.user.left_bsv  ?? 0) + '</small></div>' +
+                        '<span class="leg-side">L: ' + (n.user.left_count ?? 0) + '</span>' +
+                        '<span class="leg-basic leg-clickable"  onclick="showLegDetail(event,' + n.user.id + ',\'left\',\'basic_package\')">BSV: ₹' + (n.user.left_basic_vol ?? 0).toLocaleString('en-IN') + '</span>' +
+                        '<span class="leg-premium leg-clickable" onclick="showLegDetail(event,' + n.user.id + ',\'left\',\'premium_package\')">PSV: ₹' + (n.user.left_premium_vol ?? 0).toLocaleString('en-IN') + '</span>' +
                     '</div>' +
                     '<div class="node-leg">' +
-                        '<span>R: ' + (n.user.right_count ?? 0) + '</span>' +
-                        '<div class="node-vol"><small>PSV: ₹' + (n.user.right_psv ?? 0) + '</small><small>BSV: ₹' + (n.user.right_bsv ?? 0) + '</small></div>' +
+                        '<span class="leg-side">R: ' + (n.user.right_count ?? 0) + '</span>' +
+                        '<span class="leg-basic leg-clickable"  onclick="showLegDetail(event,' + n.user.id + ',\'right\',\'basic_package\')">BSV: ₹' + (n.user.right_basic_vol ?? 0).toLocaleString('en-IN') + '</span>' +
+                        '<span class="leg-premium leg-clickable" onclick="showLegDetail(event,' + n.user.id + ',\'right\',\'premium_package\')">PSV: ₹' + (n.user.right_premium_vol ?? 0).toLocaleString('en-IN') + '</span>' +
                     '</div>' +
                 '</div>' +
                 '<div class="node-actions">' +
@@ -683,14 +718,12 @@ function renderBinaryTree() {
             canvas.appendChild(el);
         } else {
             el.className = 'vacant-node';
-            el.innerHTML =
-                '<div class="vacant-circle"><i class="fas fa-plus"></i></div>' +
-                '<div class="vacant-label">VACANT</div>' +
-                '<div class="vacant-slot">' + (n.vacantPosition ? n.vacantPosition.charAt(0).toUpperCase() + n.vacantPosition.slice(1) + ' slot' : '') + '</div>';
-            el.setAttribute('data-toggle', 'modal');
-            el.setAttribute('data-target', '#placeUserModal');
             const pid = n.vacantParentId, pos = n.vacantPosition;
-            el.onclick = function () { setPlacementTarget(pid, pos); };
+            el.innerHTML =
+                '<div class="vacant-circle" data-toggle="modal" data-target="#placeUserModal" onclick="setPlacementTarget(' + pid + ',\'' + pos + '\')"><i class="fas fa-plus"></i></div>' +
+                '<div class="vacant-label">VACANT</div>' +
+                '<div class="vacant-slot">' + (pos ? pos.charAt(0).toUpperCase() + pos.slice(1) + ' slot' : '') + '</div>' +
+                '<button class="btn btn-xs btn-warning mt-1 btn-quick-user" style="font-size:32px;padding:4px 10px;" onclick="quickTestUser(event,' + pid + ',\'' + pos + '\')"><i class="fas fa-bolt"></i> Quick</button>';
             el.style.left = n.x + 'px';
             el.style.top  = n.y + 'px';
             canvas.appendChild(el);
@@ -758,7 +791,10 @@ const ROUTES = {
     reload:             '{{ route("admin.binary_tree") }}',
     checkSlots:         '{{ route("admin.binary_tree.check_slots") }}',
     moveUser:           '{{ route("admin.binary_tree.move_user") }}',
+    quickUser:          '{{ route("admin.binary_tree.quick_user") }}',
+    pinOwners:          '{{ route("admin.binary_tree.pin_owners") }}',
     userPackages:       '{{ route("admin.binary_tree.user_packages") }}',
+    legVolumeDetail:    '{{ route("admin.binary_tree.leg_volume_detail") }}',
 };
 const CSRF = '{{ csrf_token() }}';
 
@@ -820,6 +856,28 @@ $('#btnSetRoot').on('click', function () {
         }
     });
 });
+
+// ── Quick Test User ────────────────────────────────────────────────────────────
+function quickTestUser(e, parentId, position) {
+    e.stopPropagation();
+    Swal.fire({
+        title: 'Create test user?',
+        html: position.charAt(0).toUpperCase() + position.slice(1) + ' slot under parent ID ' + parentId,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Generate',
+        confirmButtonColor: '#fd7e14',
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        postJSON(ROUTES.quickUser, { parent_id: parentId, position: position }, function (res) {
+            if (res.status === 'success') {
+                Swal.fire('Done!', 'Created: <b>' + res.connection + '</b><br>Password: <code>' + res.password + '</code>', 'success').then(reloadPage);
+            } else {
+                Swal.fire('Error', res.message || 'Failed', 'error');
+            }
+        });
+    });
+}
 
 // ── Placement ─────────────────────────────────────────────────────────────────
 function setPlacementTarget(parentId, position) {
@@ -1077,17 +1135,29 @@ const PKG_BADGE_CLASS = {
     prime_package:   'prime',
 };
 
-function openPackageModal(e, userId, userName) {
-    e.stopPropagation();
-    $('#pkgUserId').val(userId);
-    $('#pkgUserName').text(userName);
-    $('#pkgPackageId').val('').find('option').show();
+const IS_ADMIN = {{ (auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin') ? 'true' : 'false' }};
+
+function resetPackageModal() {
+    $('#pkgUserId').val('');
+    $('#pkgUserName').text('-');
+    $('#pkgPackageId').val('');
     $('#pkgPinId').html('<option value="">-- Select package first --</option>');
     $('#pkgProductId').html('<option value="">-- Select package first --</option>');
     $('#pkgCurrentSection').hide();
     $('#pkgCurrentList').empty();
+    $('#pkgPinSection').hide();
+    $('#pkgProductSection').hide();
+    $('#pkgPackageSection').hide();
+    if (IS_ADMIN) {
+        if ($('#pkgPinOwnerDropdown').data('select2')) {
+            $('#pkgPinOwnerDropdown').val('').trigger('change');
+        } else {
+            $('#pkgPinOwnerDropdown').val('');
+        }
+    }
+}
 
-    // Fetch current packages for this user
+function loadUserPackageBadges(userId) {
     $.get(ROUTES.userPackages, { user_id: userId }, function (packages) {
         if (packages && packages.length) {
             const $list = $('#pkgCurrentList').empty();
@@ -1101,21 +1171,67 @@ function openPackageModal(e, userId, userName) {
                 );
             });
             $('#pkgCurrentSection').show();
+        } else {
+            $('#pkgCurrentSection').hide();
         }
     });
+}
+
+function openPackageModal(e, userId, userName) {
+    e.stopPropagation();
+    resetPackageModal();
+
+    // Target user = the node clicked — fixed, never changes
+    $('#pkgUserId').val(userId);
+    $('#pkgUserName').text(userName);
+
+    // Preserve current node_id so redirect returns to same subtree view
+    const currentNodeId = new URLSearchParams(window.location.search).get('node_id');
+    $('#pkgNodeId').val(currentNodeId || '');
+    $('#pkgPackageSection').show();
+    loadUserPackageBadges(userId);
+
+    if (IS_ADMIN) {
+        // Load only allowed pin owners: this user + their binary tree ancestors
+        $('#pkgPinOwnerDropdown').html('<option value="">Loading...</option>').prop('disabled', true);
+        $.get(ROUTES.pinOwners, { user_id: userId }, function (owners) {
+            const $dd = $('#pkgPinOwnerDropdown').empty().prop('disabled', false);
+            $dd.append('<option value="">-- Select pin owner --</option>');
+            owners.forEach(function (o) {
+                $dd.append('<option value="' + o.id + '">' + o.label + '</option>');
+            });
+            $dd.trigger('change'); // refresh Select2
+        });
+    }
 
     $('#packageModal').modal('show');
 }
 
+// Admin: pin owner dropdown — only controls which pins load, NOT the target user
+$('#pkgPinOwnerDropdown').on('change', function () {
+    const pinOwnerId = $(this).val();
+    $('#pkgPinId').html('<option value="">-- Select package first --</option>');
+    // Re-trigger package change to reload pins for new owner
+    const packageId = $('#pkgPackageId').val();
+    if (pinOwnerId && packageId) {
+        $('#pkgPackageId').trigger('change');
+    }
+});
+
 $('#pkgPackageId').on('change', function () {
-    const packageId = $(this).val();
-    const userId    = $('#pkgUserId').val();
-    if (!packageId) return;
+    const packageId  = $(this).val();
+    const targetId   = $('#pkgUserId').val();
+    // Admin uses pin owner dropdown; regular user uses themselves
+    const pinOwnerId = IS_ADMIN ? ($('#pkgPinOwnerDropdown').val() || targetId) : targetId;
+
+    if (!packageId || !targetId) return;
 
     $('#pkgPinId').html('<option value="">Loading...</option>');
     $('#pkgProductId').html('<option value="">Loading...</option>');
+    $('#pkgPinSection').show();
+    $('#pkgProductSection').show();
 
-    $.get('/get-available-pins', { package_id: packageId, user_id: $('#pkgUserId').val() }, function (res) {
+    $.get('/get-available-pins', { package_id: packageId, user_id: pinOwnerId, target_user_id: targetId }, function (res) {
         const $pins = $('#pkgPinId').empty().append('<option value="">-- Choose Pin --</option>');
         if (res.pins && res.pins.length) {
             res.pins.forEach(function (p) {
@@ -1165,5 +1281,60 @@ $('#btnCompleteMigration').on('click', function () {
         });
     });
 });
+
+// ── Leg Volume Detail Popup (admin only) ─────────────────────────────────────
+function showLegDetail(e, userId, side, packageCode) {
+    e.stopPropagation();
+    const label = packageCode === 'basic_package' ? 'BSV (Basic)' : 'PSV (Premium)';
+    const sideLabel = side === 'left' ? 'Left' : 'Right';
+
+    $('#legDetailTitle').text(sideLabel + ' Leg — ' + label + ' Breakdown');
+    $('#legDetailBody').html('<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>');
+    $('#legDetailModal').modal('show');
+
+    $.get(ROUTES.legVolumeDetail, { user_id: userId, side: side, package_code: packageCode }, function (res) {
+        if (!res.rows || !res.rows.length) {
+            $('#legDetailBody').html('<p class="text-muted text-center py-3">No activations found in this leg.</p>');
+            return;
+        }
+        let html = '<table class="table table-sm table-bordered">' +
+            '<thead class="thead-light"><tr>' +
+            '<th>#</th><th>ID</th><th>Name</th><th>Package</th><th>Activated On</th><th class="text-right">BV</th>' +
+            '</tr></thead><tbody>';
+        res.rows.forEach(function (r, i) {
+            html += '<tr>' +
+                '<td>' + (i + 1) + '</td>' +
+                '<td><span class="text-primary font-weight-bold">' + r.connection + '</span></td>' +
+                '<td>' + r.name + '</td>' +
+                '<td>' + r.package_name + '</td>' +
+                '<td>' + (r.activated_at ? r.activated_at.substring(0, 10) : '') + '</td>' +
+                '<td class="text-right font-weight-bold">₹' + Number(r.bv).toLocaleString('en-IN') + '</td>' +
+                '</tr>';
+        });
+        html += '</tbody><tfoot><tr class="table-info">' +
+            '<td colspan="5" class="text-right font-weight-bold">Total BV</td>' +
+            '<td class="text-right font-weight-bold">₹' + Number(res.total_bv).toLocaleString('en-IN') + '</td>' +
+            '</tr></tfoot></table>';
+        $('#legDetailBody').html(html);
+    }).fail(function () {
+        $('#legDetailBody').html('<p class="text-danger text-center">Failed to load data.</p>');
+    });
+}
 </script>
+
+{{-- Leg Volume Detail Modal --}}
+<div class="modal fade" id="legDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="legDetailTitle">Leg Volume Breakdown</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body" id="legDetailBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection

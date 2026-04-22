@@ -238,11 +238,19 @@
                                 </p>
                             </a>
                             <ul class="nav nav-treeview team">
+                                @php $migrationDone = \App\Models\BinaryTreeSetting::current()->migration_complete; @endphp
                                 <li class="nav-item">
-                                    <a href="{{ route('sunflower') }}" class="nav-link binary">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>My Team</p>
-                                    </a>
+                                    @if($migrationDone)
+                                        <a href="{{ route('user.binary_tree') }}" class="nav-link binary">
+                                            <i class="fas fa-sitemap nav-icon"></i>
+                                            <p>My Tree</p>
+                                        </a>
+                                    @else
+                                        <a href="{{ route('sunflower') }}" class="nav-link binary">
+                                            <i class="far fa-circle nav-icon"></i>
+                                            <p>My Team</p>
+                                        </a>
+                                    @endif
                                 </li>
                                 @if(auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin')
                                 <li class="nav-item">
@@ -251,7 +259,19 @@
                                         <p>Binary Tree <span class="badge badge-warning badge-sm ml-1">Admin</span></p>
                                     </a>
                                 </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('admin.binary_income') }}" class="nav-link">
+                                        <i class="fas fa-chart-bar nav-icon text-success"></i>
+                                        <p>Binary Income <span class="badge badge-success badge-sm ml-1">Admin</span></p>
+                                    </a>
+                                </li>
                                 @endif
+                                <li class="nav-item">
+                                    <a href="{{ route('binary_income_details') }}" class="nav-link">
+                                        <i class="fas fa-money-bill-wave nav-icon text-primary"></i>
+                                        <p>My Binary Income</p>
+                                    </a>
+                                </li>
                                 <li class="nav-item has-treeview rank_details">
                                     <a href="{{ route('rank_details') }}" class="nav-link rank_details">
                                         <i class="nav-icon fas fa-medal">‌</i>
