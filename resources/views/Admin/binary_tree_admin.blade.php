@@ -203,6 +203,20 @@
 .pkg-badge.prime   { background: #fff3e0; color: #7a3300; border: 1px solid #fd7e14; }
 .pkg-badge.other   { background: #e9ecef; color: #495057; border: 1px solid #adb5bd; }
 
+/* ── Account type badges on tree nodes ── */
+.acct-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    margin: 3px 0 4px;
+    letter-spacing: 0.3px;
+}
+.acct-mother    { background: #d4edda; color: #155724; border: 1px solid #28a745; }
+.acct-privilege { background: #cce5ff; color: #004085; border: 1px solid #004085; }
+.acct-child     { background: #e2e3e5; color: #383d41; border: 1px solid #6c757d; }
+
 /* ── Search input ── */
 #transferSearch { margin-bottom: 10px; }
 .user-search-result {
@@ -688,10 +702,19 @@ function renderBinaryTree() {
             const imgHtml = hasMore
                 ? '<div class="node-img-wrap">' + imgTag + '<div class="has-more-badge" onclick="viewSubtree(event,' + n.user.id + ')" title="Has children — click to view"><i class="fas fa-chevron-down"></i></div></div>'
                 : imgTag;
+            const motherId = n.user.mother_id ?? 1;
+            const acctBadge = motherId == 1
+                ? '<span class="acct-badge acct-mother">Mother ID</span>'
+                : (motherId == 2
+                    ? '<span class="acct-badge acct-privilege">Privilege 1</span>'
+                    : (motherId == 3
+                        ? '<span class="acct-badge acct-privilege">Privilege 2</span>'
+                        : '<span class="acct-badge acct-child">Child ID</span>'));
             el.innerHTML =
                 imgHtml +
                 '<div class="node-id">'  + (n.user.connection || '') + '</div>' +
                 '<div class="node-name">' + (n.user.name || '')       + '</div>' +
+                acctBadge +
                 '<div class="node-lr">' +
                     '<div class="node-leg">' +
                         '<span class="leg-side">L: ' + (n.user.left_count ?? 0) + '</span>' +
