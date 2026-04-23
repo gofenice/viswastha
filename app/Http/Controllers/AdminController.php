@@ -6142,6 +6142,12 @@ class AdminController extends Controller
 
         $user = User::find($request->user_id);
 
+        // PAN card subtree check: if user has a PAN, new position must be under their Mother ID
+        if ($user->pan_card_no && $user->mother_id != 1) {
+            $conflict = $this->checkMotherSubtreeConflict($user, $request->parent_id);
+            if ($conflict) return response()->json(['status' => 'error', 'message' => $conflict]);
+        }
+
         // Remove from old position if already placed
         $user->parent_id = $request->parent_id;
         $user->position  = $request->position;
@@ -6279,6 +6285,12 @@ class AdminController extends Controller
             return response()->json(['status' => 'error', 'message' => 'That position is already occupied.']);
         }
 
+        // PAN card subtree check: if user has a PAN, new position must be under their Mother ID
+        if ($user->pan_card_no && $user->mother_id != 1) {
+            $conflict = $this->checkMotherSubtreeConflict($user, $targetParent->id);
+            if ($conflict) return response()->json(['status' => 'error', 'message' => $conflict]);
+        }
+
         // Perform the move: update the user's parent and position
         $user->parent_id = $targetParent->id;
         $user->position  = $request->position;
@@ -6289,6 +6301,41 @@ class AdminController extends Controller
         $this->recalculateLevels($user);
 
         return response()->json(['status' => 'success', 'message' => $user->name . ' and their subtree moved successfully.']);
+    }
+
+    /**
+     * Check if $targetParentId is within the Mother ID's binary subtree for $user's PAN card.
+     * Returns null if OK, or an error message string describing the conflict.
+     */
+    private function checkMotherSubtreeConflict(User $user, int $targetParentId): ?string
+    {
+        $motherUser = DB::table('users')
+            ->where('pan_card_no', $user->pan_card_no)
+            ->where('mother_id', 1)
+            ->first();
+
+        if (!$motherUser) return null;
+
+        $inSubtree = DB::select("
+            WITH RECURSIVE subtree AS (
+                SELECT id FROM users WHERE id = ?
+                UNION ALL
+                SELECT u.id FROM users u
+                INNER JOIN subtree s ON u.parent_id = s.id
+            )
+            SELECT COUNT(*) as cnt FROM subtree WHERE id = ?
+        ", [$motherUser->id, $targetParentId]);
+
+        if (($inSubtree[0]->cnt ?? 0) == 0) {
+            $accountType = match($user->mother_id) {
+                2 => 'Privilege 1',
+                3 => 'Privilege 2',
+                default => 'Child ID',
+            };
+            return "{$user->name} ({$user->connection}) is a {$accountType} — must stay within Mother ID {$motherUser->connection}'s tree. Moving outside is not allowed.";
+        }
+
+        return null;
     }
 
     /**
