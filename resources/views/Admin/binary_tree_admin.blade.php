@@ -206,7 +206,7 @@
 /* ── Account type badges on tree nodes ── */
 .acct-badge {
     display: inline-block;
-    font-size: 10px !important;
+    font-size: 30px !important;
     font-weight: 700;
     padding: 2px 7px;
     border-radius: 10px;
