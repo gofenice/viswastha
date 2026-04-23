@@ -2875,6 +2875,61 @@ class AdminController extends Controller
         return view('Admin/user_list', compact('users'));
     }
 
+    public function assignPanCard(Request $request)
+    {
+        $request->validate([
+            'user_id'    => 'required|exists:users,id',
+            'pan_card_no'=> 'required|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/',
+        ]);
+
+        $user = User::findOrFail($request->user_id);
+
+        if ($user->pan_card_no) {
+            return response()->json(['status' => 'error', 'message' => 'User already has a PAN card.']);
+        }
+
+        $pan     = strtoupper($request->pan_card_no);
+        $existing = DB::table('users')->where('pan_card_no', $pan)->first();
+
+        if ($existing) {
+            // Name must match
+            if (strtolower($existing->name) !== strtolower($user->name)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Name mismatch. PAN belongs to "' . $existing->name . '" but this user is "' . $user->name . '".',
+                ]);
+            }
+
+            // Assign privilege or child slot
+            $slot2 = DB::table('users')->where('pan_card_no', $pan)->where('mother_id', 2)->exists();
+            $slot3 = DB::table('users')->where('pan_card_no', $pan)->where('mother_id', 3)->exists();
+
+            if (!$slot2) {
+                $motherid = 2;
+            } elseif (!$slot3) {
+                $motherid = 3;
+            } else {
+                $motherid = 0; // Child ID
+            }
+        } else {
+            // New PAN → Mother ID
+            $motherid = 1;
+        }
+
+        $user->pan_card_no = $pan;
+        $user->mother_id   = $motherid;
+        $user->save();
+
+        $label = match($motherid) {
+            1 => 'Mother ID',
+            2 => 'Privilege 1',
+            3 => 'Privilege 2',
+            default => 'Child ID',
+        };
+
+        return response()->json(['status' => 'success', 'label' => $label, 'mother_id' => $motherid]);
+    }
+
     public function changeAccountType(Request $request)
     {
         $user = User::findOrFail($request->user_id);

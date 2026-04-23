@@ -86,6 +86,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/binary-income/run', [AdminController::class, 'runBinaryIncome'])->name('admin.binary_income.run');
     Route::post('/admin/binary-income/clear-wallets', [AdminController::class, 'clearBinaryWallets'])->name('admin.binary_income.clear_wallets');
     Route::post('/admin/user/change-account-type', [AdminController::class, 'changeAccountType'])->name('admin.user.change_account_type');
+    Route::post('/admin/user/assign-pan', [AdminController::class, 'assignPanCard'])->name('admin.user.assign_pan');
     Route::get('/directy_income_details', [AdminController::class, 'directy_income_details'])->name('directy_income_details');
     Route::get('/royalty_income_details', [AdminController::class, 'royalty_income_details'])->name('royalty_income_details');
     Route::get('/package', [AdminController::class, 'package'])->name('package');

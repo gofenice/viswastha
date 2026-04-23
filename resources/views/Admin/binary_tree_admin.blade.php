@@ -480,6 +480,32 @@
 
                     <p class="mb-2">Activating for: <strong id="pkgUserName">-</strong></p>
 
+                    {{-- PAN Card step (shown when user has no PAN and no package) --}}
+                    <div id="panStepSection" style="display:none;">
+                        <div class="alert alert-warning py-2">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            This user has no PAN card. Please assign one before activating a package.
+                        </div>
+                        <div class="form-group mb-1">
+                            <label>PAN Card Number <span class="text-danger">*</span></label>
+                            <input type="text" id="panStepInput" class="form-control text-uppercase"
+                                   placeholder="e.g. ABCDE1234F" maxlength="10"
+                                   oninput="this.value=this.value.toUpperCase()">
+                            <small id="panStepMsg" class="mt-1 d-block"></small>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" id="panStepVerifyBtn">
+                            <i class="fas fa-check"></i> Verify &amp; Continue
+                        </button>
+                    </div>
+
+                    {{-- Normal package/pin section (hidden until PAN step complete) --}}
+                    <div id="panStepDone" style="display:none;">
+                        <div class="alert alert-success py-2 mb-2">
+                            <i class="fas fa-check-circle"></i> PAN assigned — <strong id="panStepAssignedLabel"></strong>
+                        </div>
+                    </div>
+
+                    <div id="pkgMainSection">
                     @if(auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin')
                     {{-- Admin: choose whose pin to use --}}
                     <div class="form-group">
@@ -520,6 +546,7 @@
                             <option value="">-- Select package first --</option>
                         </select>
                     </div>
+                    </div>{{-- /pkgMainSection --}}
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -733,7 +760,7 @@ function renderBinaryTree() {
                 '</div>' +
                 '<div class="node-actions">' +
                     '<button class="node-action-btn btn-node-view"    title="View subtree"      onclick="viewSubtree(event,' + n.user.id + ')"><i class="fas fa-sitemap"></i></button>' +
-                    '<button class="node-action-btn btn-node-package" title="Activate package"  onclick="openPackageModal(event,' + n.user.id + ',\'' + (n.user.name||'').replace(/'/g,"\\'") + '\')"><i class="fas fa-box-open"></i></button>' +
+                    '<button class="node-action-btn btn-node-package" title="Activate package"  onclick="openPackageModal(event,' + n.user.id + ',\'' + (n.user.name||'').replace(/'/g,"\\'") + '\',' + (hasPan ? 'true' : 'false') + ',' + (n.user.package_type ? 'true' : 'false') + ')"><i class="fas fa-box-open"></i></button>' +
                     '<button class="node-action-btn btn-node-move"    title="Move user"         onclick="moveNode(event,' + n.user.id + ')"><i class="fas fa-arrows-alt"></i></button>' +
                     '<button class="node-action-btn btn-node-delete"  title="Remove from tree"  onclick="deleteNode(event,' + n.user.id + ',\'' + (n.user.name||'').replace(/'/g,"\\'") + '\')"><i class="fas fa-trash-alt"></i></button>' +
                 '</div>';
@@ -1204,38 +1231,94 @@ function loadUserPackageBadges(userId) {
     });
 }
 
-function openPackageModal(e, userId, userName) {
+function openPackageModal(e, userId, userName, hasPan, hasPackage) {
     e.stopPropagation();
     resetPackageModal();
 
-    // Target user = the node clicked — fixed, never changes
+    hasPan      = hasPan      ?? true;
+    hasPackage  = hasPackage  ?? true;
+
     $('#pkgUserId').val(userId);
     $('#pkgUserName').text(userName);
 
-    // Preserve current node_id so redirect returns to same subtree view
     const currentNodeId = new URLSearchParams(window.location.search).get('node_id');
     $('#pkgNodeId').val(currentNodeId || '');
-    $('#pkgPackageSection').show();
-    loadUserPackageBadges(userId);
 
-    if (IS_ADMIN) {
-        // Load only allowed pin owners: this user + their binary tree ancestors
-        $('#pkgPinOwnerDropdown').html('<option value="">Loading...</option>').prop('disabled', true);
-        $.get(ROUTES.pinOwners, { user_id: userId }, function (owners) {
-            const $dd = $('#pkgPinOwnerDropdown').empty().prop('disabled', false);
-            $dd.append('<option value="">-- Select pin owner --</option>');
-            owners.forEach(function (o) {
-                $dd.append('<option value="' + o.id + '">' + o.label + '</option>');
-            });
-            $dd.trigger('change'); // refresh Select2
-        });
+    // No PAN + no package → show PAN step first
+    if (!hasPan && !hasPackage) {
+        $('#panStepSection').show();
+        $('#pkgMainSection').hide();
+        $('#panStepInput').val('').focus();
+        $('#panStepMsg').text('').removeClass('text-success text-danger');
+        $('#packageModal .btn-success').prop('disabled', true);
+    } else {
+        $('#panStepSection').hide();
+        $('#pkgMainSection').show();
+        $('#pkgPackageSection').show();
+        loadUserPackageBadges(userId);
+        if (IS_ADMIN) loadPinOwners(userId);
+        $('#packageModal .btn-success').prop('disabled', false);
     }
 
     $('#packageModal').modal('show');
 }
 
+function loadPinOwners(userId) {
+    $('#pkgPinOwnerDropdown').html('<option value="">Loading...</option>').prop('disabled', true);
+    $.get(ROUTES.pinOwners, { user_id: userId }, function (owners) {
+        const $dd = $('#pkgPinOwnerDropdown').empty().prop('disabled', false);
+        $dd.append('<option value="">-- Select pin owner --</option>');
+        owners.forEach(function (o) {
+            $dd.append('<option value="' + o.id + '">' + o.label + '</option>');
+        });
+        $dd.trigger('change');
+    });
+}
+
+// PAN verify button
+$('#panStepVerifyBtn').on('click', function () {
+    const pan    = $('#panStepInput').val().trim().toUpperCase();
+    const userId = $('#pkgUserId').val();
+    const name   = $('#pkgUserName').text().trim();
+
+    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
+        $('#panStepMsg').text('Invalid PAN format. Must be like ABCDE1234F.').removeClass('text-success').addClass('text-danger');
+        return;
+    }
+
+    $('#panStepVerifyBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Verifying...');
+
+    $.post('{{ route('admin.user.assign_pan') }}', {
+        _token: '{{ csrf_token() }}',
+        user_id: userId,
+        pan_card_no: pan,
+        name: name
+    })
+    .done(function (res) {
+        if (res.status === 'success') {
+            $('#panStepMsg').text('').removeClass('text-danger');
+            $('#panStepSection').hide();
+            $('#panStepDone').show();
+            $('#panStepAssignedLabel').text(res.label + ' — PAN: ' + pan);
+            $('#pkgMainSection').show();
+            $('#pkgPackageSection').show();
+            loadUserPackageBadges(userId);
+            if (IS_ADMIN) loadPinOwners(userId);
+            $('#packageModal .btn-success').prop('disabled', false);
+        } else {
+            $('#panStepMsg').text(res.message).removeClass('text-success').addClass('text-danger');
+        }
+    })
+    .fail(function () {
+        $('#panStepMsg').text('Server error. Try again.').addClass('text-danger');
+    })
+    .always(function () {
+        $('#panStepVerifyBtn').prop('disabled', false).html('<i class="fas fa-check"></i> Verify & Continue');
+    });
+});
+
 // Admin: pin owner dropdown — only controls which pins load, NOT the target user
-$('#pkgPinOwnerDropdown').on('change', function () {
+$('#pkgPinOwnerDropdown').off('change').on('change', function () {
     const pinOwnerId = $(this).val();
     $('#pkgPinId').html('<option value="">-- Select package first --</option>');
     // Re-trigger package change to reload pins for new owner
