@@ -47,11 +47,29 @@
                                 <td>
                                     @if($user->mother_id == 1)
                                         <span class="badge badge-success" style="font-size:12px;">Mother ID</span>
-                                    @elseif($user->mother_id == 2 || $user->mother_id == 3)
-                                        <span class="badge badge-primary" style="font-size:12px;">Privilege ID</span>
+                                        <br><small class="text-muted">Cannot change</small>
+                                    @elseif($user->mother_id == 2)
+                                        <span class="badge badge-primary acct-type-badge" id="badge-{{ $user->id }}" style="font-size:12px;">Privilege 1</span>
+                                        <br>
+                                        <button class="btn btn-xs btn-outline-warning mt-1"
+                                                onclick="changeAcctType({{ $user->id }}, 'Privilege 1')">
+                                            <i class="fas fa-exchange-alt"></i> Change
+                                        </button>
+                                    @elseif($user->mother_id == 3)
+                                        <span class="badge badge-primary acct-type-badge" id="badge-{{ $user->id }}" style="font-size:12px;">Privilege 2</span>
+                                        <br>
+                                        <button class="btn btn-xs btn-outline-warning mt-1"
+                                                onclick="changeAcctType({{ $user->id }}, 'Privilege 2')">
+                                            <i class="fas fa-exchange-alt"></i> Change
+                                        </button>
                                     @else
-                                        <span class="badge badge-secondary" style="font-size:12px;">Child ID</span>
+                                        <span class="badge badge-secondary acct-type-badge" id="badge-{{ $user->id }}" style="font-size:12px;">Child ID</span>
                                         <br><small class="text-danger">No pair income</small>
+                                        <br>
+                                        <button class="btn btn-xs btn-outline-primary mt-1"
+                                                onclick="changeAcctType({{ $user->id }}, 'Child ID')">
+                                            <i class="fas fa-arrow-up"></i> Promote
+                                        </button>
                                     @endif
                                 </td>
                                 <td>{{ $user->pan_card_no }}</td>
@@ -720,6 +738,48 @@
             $('#currentamt').val(currentamt);
             $('#modal-trashMoney').modal('show');
         }
+    </script>
+
+    <script>
+    function changeAcctType(userId, currentLabel) {
+        const isPrivilege = currentLabel.includes('Privilege');
+        const action = isPrivilege ? 'demote to Child ID' : 'promote to Privilege ID';
+        Swal.fire({
+            title: 'Change Account Type?',
+            html: 'This will <b>' + action + '</b>.<br>This affects binary pair income eligibility.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: isPrivilege ? '#6c757d' : '#007bff',
+            confirmButtonText: 'Yes, ' + action,
+            cancelButtonText: 'Cancel',
+        }).then(function(result) {
+            if (!result.isConfirmed) return;
+            fetch('{{ route('admin.user.change_account_type') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ user_id: userId })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const badge = document.getElementById('badge-' + userId);
+                    if (badge) {
+                        badge.textContent = data.label;
+                        badge.className = 'badge acct-type-badge ' +
+                            (data.new_type == 0 ? 'badge-secondary' : 'badge-primary');
+                        badge.style.fontSize = '12px';
+                    }
+                    Swal.fire({ icon: 'success', title: 'Changed to ' + data.label, timer: 1500, showConfirmButton: false });
+                    setTimeout(() => location.reload(), 1600);
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                }
+            });
+        });
+    }
     </script>
 
     {{-- Session-based Alerts --}}

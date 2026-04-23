@@ -2875,6 +2875,46 @@ class AdminController extends Controller
         return view('Admin/user_list', compact('users'));
     }
 
+    public function changeAccountType(Request $request)
+    {
+        $user = User::findOrFail($request->user_id);
+
+        // Mother ID can never be changed
+        if ($user->mother_id == 1) {
+            return response()->json(['status' => 'error', 'message' => 'Mother ID cannot be changed.']);
+        }
+
+        $pan = $user->pan_card_no;
+
+        if ($user->mother_id == 0) {
+            // Child → promote to Privilege: find lowest free slot (2 or 3)
+            $slot2Taken = DB::table('users')->where('pan_card_no', $pan)->where('mother_id', 2)->exists();
+            $slot3Taken = DB::table('users')->where('pan_card_no', $pan)->where('mother_id', 3)->exists();
+
+            if (!$slot2Taken) {
+                $user->mother_id = 2;
+            } elseif (!$slot3Taken) {
+                $user->mother_id = 3;
+            } else {
+                return response()->json(['status' => 'error', 'message' => 'Both Privilege slots are taken. Demote one first.']);
+            }
+        } else {
+            // Privilege → demote to Child
+            $user->mother_id = 0;
+        }
+
+        $user->save();
+
+        $label = match($user->mother_id) {
+            1 => 'Mother ID',
+            2 => 'Privilege 1',
+            3 => 'Privilege 2',
+            default => 'Child ID',
+        };
+
+        return response()->json(['status' => 'success', 'new_type' => $user->mother_id, 'label' => $label]);
+    }
+
     public function getUserDetails($id)
     {
         $user = User::find($id); // Assuming you have a User model
