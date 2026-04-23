@@ -45,7 +45,7 @@
                                     @endif
                                 </td>
                                 <td>
-                                    @if(!$user->pan_card_no)
+                                    @if(!$user->pan_card_no || strtoupper($user->pan_card_no) === 'STORE')
                                         <span class="badge badge-warning" style="font-size:12px;">No PAN Card</span>
                                     @elseif($user->mother_id == 1)
                                         <span class="badge badge-success" style="font-size:12px;">Mother ID</span>
@@ -74,7 +74,7 @@
                                         </button>
                                     @endif
                                 </td>
-                                <td>{{ $user->pan_card_no }}</td>
+                                <td>{{ strtoupper($user->pan_card_no ?? '') === 'STORE' ? '—' : ($user->pan_card_no ?? '—') }}</td>
                                 <td>
                                     {{-- <b> Pancard :</b> {{ $user->pan_card_no }}<br> --}}
                                     <b> Phone no :</b> {{ $user->phone_no }}<br>
@@ -359,7 +359,7 @@
                         const user = response.data;
                         $('#id').val(user.id);
                         $('#name').val(user.name);
-                        $('#pan_card_no').val(user.pan_card_no);
+                        $('#pan_card_no').val(user.pan_card_no && user.pan_card_no.toUpperCase() !== 'STORE' ? user.pan_card_no : '');
                         $('#email').val(user.email);
                         $('#phone_no').val(user.phone_no);
                         $('#pincode').val(user.pincode);
@@ -653,7 +653,7 @@
                         const user = response.data;
                         $('#id').val(user.id);
                         $('#name').val(user.name);
-                        $('#pan_card_no').val(user.pan_card_no);
+                        $('#pan_card_no').val(user.pan_card_no && user.pan_card_no.toUpperCase() !== 'STORE' ? user.pan_card_no : '');
                         $('#email').val(user.email);
                         $('#phone_no').val(user.phone_no);
                         $('#pincode').val(user.pincode);

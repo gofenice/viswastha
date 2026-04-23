@@ -2884,7 +2884,7 @@ class AdminController extends Controller
 
         $user = User::findOrFail($request->user_id);
 
-        if ($user->pan_card_no) {
+        if ($user->pan_card_no && strtoupper($user->pan_card_no) !== 'STORE') {
             return response()->json(['status' => 'error', 'message' => 'User already has a PAN card.']);
         }
 
@@ -6649,18 +6649,19 @@ class AdminController extends Controller
         // Flag: this node has children that are hidden because depth limit reached
         $user->has_more = ($depth === 1) && ($left || $right);
 
-        // Basic and Premium BV per leg (SUM of binary_commission, cutoff: binary launch date)
-        $user->left_basic_vol    = $this->legVolumeByPackageCode($user->id, 'left',  'basic_package');
-        $user->left_premium_vol  = $this->legVolumeByPackageCode($user->id, 'left',  'premium_package');
-        $user->right_basic_vol   = $this->legVolumeByPackageCode($user->id, 'right', 'basic_package');
-        $user->right_premium_vol = $this->legVolumeByPackageCode($user->id, 'right', 'premium_package');
-
         // Resolve package type for profile ring color
         $codes = \App\Models\UserPackage::where('user_packages.user_id', $user->id)
             ->where('user_packages.status', 1)
             ->join('packages', 'packages.id', '=', 'user_packages.package_id')
             ->pluck('packages.package_code')
             ->toArray();
+
+        $hasBasic   = in_array('basic_package',   $codes);
+        $hasPremium = in_array('premium_package', $codes);
+        $user->left_basic_vol    = $hasBasic   ? $this->legVolumeByPackageCode($user->id, 'left',  'basic_package')   : 0;
+        $user->left_premium_vol  = $hasPremium ? $this->legVolumeByPackageCode($user->id, 'left',  'premium_package') : 0;
+        $user->right_basic_vol   = $hasBasic   ? $this->legVolumeByPackageCode($user->id, 'right', 'basic_package')   : 0;
+        $user->right_premium_vol = $hasPremium ? $this->legVolumeByPackageCode($user->id, 'right', 'premium_package') : 0;
 
         if (in_array('premium_package', $codes)) {
             $user->package_type = 'premium';

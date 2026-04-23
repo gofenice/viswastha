@@ -731,7 +731,7 @@ function renderBinaryTree() {
                 ? '<div class="node-img-wrap">' + imgTag + '<div class="has-more-badge" onclick="viewSubtree(event,' + n.user.id + ')" title="Has children — click to view"><i class="fas fa-chevron-down"></i></div></div>'
                 : imgTag;
             const motherId = n.user.mother_id ?? 1;
-            const hasPan   = n.user.pan_card_no && n.user.pan_card_no.trim() !== '';
+            const hasPan   = n.user.pan_card_no && n.user.pan_card_no.trim() !== '' && n.user.pan_card_no.trim().toUpperCase() !== 'STORE';
             const acctBadge = !hasPan
                 ? '<span class="acct-badge acct-nopan">No PAN Card</span>'
                 : (motherId == 1
