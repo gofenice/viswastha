@@ -957,39 +957,41 @@ class AdminController extends Controller
 
         if ($panCardExists) {
 
-
-            $branchExists = false;
-
-            while ($sponsor) {
-                if ($sponsor->pan_card_no == $request->pan_card_no) {
-                    $branchExists = true;
-                    break;
-                }
-                if ($sponsor->sponsor_id !== null) {
-                    $sponsor = User::find($sponsor->sponsor_id);
-                } else {
-                    break; // Break the loop if sponsor_id is null
-                }
-            }
-
-            if (!$branchExists) {
-                return json_encode([
-                    'status' => 'error',
-                    'message' => 'You can\'t add this user here.',
-                ]);
-            }
-
             $existingUser = DB::table('users')
                 ->where('pan_card_no', $request->pan_card_no)
                 ->first();
 
             if (strtolower($existingUser->name) !== strtolower($request->name)) {
-
                 return json_encode([
                     'status' => 'error',
                     'message' => 'The name does not match the existing record for this PAN card.',
                     'correct_name' => $existingUser->name
                 ]);
+            }
+
+            // New accounts with same PAN must be placed within the Mother ID's binary subtree
+            $motherUser = DB::table('users')
+                ->where('pan_card_no', $request->pan_card_no)
+                ->where('mother_id', 1)
+                ->first();
+
+            if ($motherUser) {
+                $inSubtree = DB::select("
+                    WITH RECURSIVE subtree AS (
+                        SELECT id FROM users WHERE id = ?
+                        UNION ALL
+                        SELECT u.id FROM users u
+                        INNER JOIN subtree s ON u.parent_id = s.id
+                    )
+                    SELECT COUNT(*) as cnt FROM subtree WHERE id = ?
+                ", [$motherUser->id, $parent_id]);
+
+                if (($inSubtree[0]->cnt ?? 0) == 0) {
+                    return json_encode([
+                        'status' => 'error',
+                        'message' => 'This user must be placed within the Mother ID\'s binary tree.',
+                    ]);
+                }
             }
 
             $motherId1Exists = DB::table('users')
@@ -1145,32 +1147,12 @@ class AdminController extends Controller
 
         if ($panCardExists) {
 
-
-            $branchExists = false;
-            while ($sponsor) {
-                if ($sponsor->pan_card_no == $request->pan_card_no) {
-                    $branchExists = true;
-                    break;
-                }
-                if ($sponsor->sponsor_id !== null) {
-                    $sponsor = User::find($sponsor->sponsor_id);
-                } else {
-                    break; // Break the loop if sponsor_id is null
-                }
-            }
-
-            if (!$branchExists) {
-
-                return redirect()->route('/')->with('error', "You can\'t add this user here.");
-            }
-
             $existingUser = DB::table('users')
                 ->where('pan_card_no', $request->pan_card_no)
                 ->first();
 
             if (strtolower($existingUser->name) !== strtolower($request->name)) {
-
-                return redirect()->route('/')->with('error', "The name does not match the existing record for this PAN card.");
+                return redirect()->back()->with('error', "The name does not match the existing record for this PAN card.");
             }
 
             $motherId1Exists = DB::table('users')

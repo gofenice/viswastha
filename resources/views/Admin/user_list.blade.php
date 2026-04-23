@@ -26,6 +26,7 @@
                         <tr class="bg-info">
                             <th>#</th>
                             <th>User</th>
+                            <th>Account Type</th>
                             <th width="">PAN Card</th>
                             <th width="17%">Details</th>
                             <th>Packages</th>
@@ -41,6 +42,16 @@
                                     <br>
                                     @if ($user->position == 'changed')
                                         <span class="badge badge-primary">Position changed</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($user->mother_id == 1)
+                                        <span class="badge badge-success" style="font-size:12px;">Mother ID</span>
+                                    @elseif($user->mother_id == 2 || $user->mother_id == 3)
+                                        <span class="badge badge-primary" style="font-size:12px;">Privilege ID</span>
+                                    @else
+                                        <span class="badge badge-secondary" style="font-size:12px;">Child ID</span>
+                                        <br><small class="text-danger">No pair income</small>
                                     @endif
                                 </td>
                                 <td>{{ $user->pan_card_no }}</td>

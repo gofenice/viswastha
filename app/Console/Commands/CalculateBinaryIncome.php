@@ -44,10 +44,13 @@ class CalculateBinaryIncome extends Command
         foreach ($packages as $package) {
             $this->info("Package: {$package->name} (BV:₹{$package->binary_commission} Cap:{$package->daily_pair_cap})");
 
+            // mother_id = 0 means Child ID — excluded from binary pair income
             $eligibleIds = DB::table('user_packages')
-                ->where('package_id', $package->id)
-                ->where('status', 1)
-                ->pluck('user_id')
+                ->join('users', 'users.id', '=', 'user_packages.user_id')
+                ->where('user_packages.package_id', $package->id)
+                ->where('user_packages.status', 1)
+                ->where('users.mother_id', '!=', 0)
+                ->pluck('user_packages.user_id')
                 ->unique()
                 ->toArray();
 
