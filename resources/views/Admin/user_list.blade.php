@@ -45,7 +45,9 @@
                                     @endif
                                 </td>
                                 <td>
-                                    @if($user->mother_id == 1)
+                                    @if(!$user->pan_card_no)
+                                        <span class="badge badge-warning" style="font-size:12px;">No PAN Card</span>
+                                    @elseif($user->mother_id == 1)
                                         <span class="badge badge-success" style="font-size:12px;">Mother ID</span>
                                         <br><small class="text-muted">Cannot change</small>
                                     @elseif($user->mother_id == 2)

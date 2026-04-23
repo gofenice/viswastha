@@ -216,6 +216,7 @@
 .acct-mother    { background: #d4edda; color: #155724; border: 1px solid #28a745; }
 .acct-privilege { background: #cce5ff; color: #004085; border: 1px solid #004085; }
 .acct-child     { background: #e2e3e5; color: #383d41; border: 1px solid #6c757d; }
+.acct-nopan     { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
 
 /* ── Search input ── */
 #transferSearch { margin-bottom: 10px; }
@@ -703,13 +704,16 @@ function renderBinaryTree() {
                 ? '<div class="node-img-wrap">' + imgTag + '<div class="has-more-badge" onclick="viewSubtree(event,' + n.user.id + ')" title="Has children — click to view"><i class="fas fa-chevron-down"></i></div></div>'
                 : imgTag;
             const motherId = n.user.mother_id ?? 1;
-            const acctBadge = motherId == 1
-                ? '<span class="acct-badge acct-mother">Mother ID</span>'
-                : (motherId == 2
-                    ? '<span class="acct-badge acct-privilege">Privilege 1</span>'
-                    : (motherId == 3
-                        ? '<span class="acct-badge acct-privilege">Privilege 2</span>'
-                        : '<span class="acct-badge acct-child">Child ID</span>'));
+            const hasPan   = n.user.pan_card_no && n.user.pan_card_no.trim() !== '';
+            const acctBadge = !hasPan
+                ? '<span class="acct-badge acct-nopan">No PAN Card</span>'
+                : (motherId == 1
+                    ? '<span class="acct-badge acct-mother">Mother ID</span>'
+                    : (motherId == 2
+                        ? '<span class="acct-badge acct-privilege">Privilege 1</span>'
+                        : (motherId == 3
+                            ? '<span class="acct-badge acct-privilege">Privilege 2</span>'
+                            : '<span class="acct-badge acct-child">Child ID</span>')));
             el.innerHTML =
                 imgHtml +
                 '<div class="node-id">'  + (n.user.connection || '') + '</div>' +
