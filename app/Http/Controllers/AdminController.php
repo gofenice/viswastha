@@ -6611,10 +6611,18 @@ class AdminController extends Controller
         $package = \App\Models\Package::find($packageId);
         if (!$package) return;
 
-        $sponsorId = $activatedUser->parent_id;
+        $sponsorId = $activatedUser->sponsor_id;
+        if (!$sponsorId) return;
 
         $amount = (float) $package->sponsor_commission;
         if ($amount <= 0) return;
+
+        // Sponsor must hold an active package of the same type to receive commission
+        $sponsorHasPackage = \App\Models\UserPackage::where('user_id', $sponsorId)
+            ->where('package_id', $packageId)
+            ->where('status', 1)
+            ->exists();
+        if (!$sponsorHasPackage) return;
 
         $type  = in_array($package->package_code, ['prime_package']) ? 'prime_sponsor' : 'binary_sponsor';
         $label = 'Sponsor commission — ' . $package->name . ' activated by ' . $activatedUser->name;
