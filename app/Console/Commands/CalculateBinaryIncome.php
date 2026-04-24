@@ -94,23 +94,68 @@ class CalculateBinaryIncome extends Command
             return;
         }
 
-        $rate    = (float) $package->binary_commission;
-        $dayCap  = (int)   $package->daily_pair_cap;
-        $matched = min($totalLeft, $totalRight);
-        $capped  = min($matched, $dayCap);
-        $income  = $capped * $rate;
+        $rate   = (float) $package->binary_commission;
+        $dayCap = (int)   $package->daily_pair_cap;
 
-        // Stronger leg carries forward; weaker leg excess flushed
-        if ($totalLeft >= $totalRight) {
-            $carryOutLeft  = $totalLeft - $capped;
-            $carryOutRight = 0;
-            $flushedLeft   = 0;
-            $flushedRight  = max(0, $totalRight - $capped);
+        if (!$lastLog) {
+            // ── First-run "2:1" unlock rule ────────────────────────────────────────
+            // Primary side (more activations, or LEFT if equal) contributes 2.
+            // Secondary side contributes 1. Those 3 are consumed for the first income.
+            // Remaining activations pair normally (1:1).
+            $leftIsPrimary  = $totalLeft >= $totalRight;
+            $primaryTotal   = $leftIsPrimary ? $totalLeft  : $totalRight;
+            $secondaryTotal = $leftIsPrimary ? $totalRight : $totalLeft;
+
+            if ($primaryTotal >= 2 && $secondaryTotal >= 1) {
+                $primaryEff     = $primaryTotal   - 2;
+                $secondaryEff   = $secondaryTotal - 1;
+                $normalPossible = min($primaryEff, $secondaryEff);
+                $matched        = 1 + $normalPossible;
+                $capped         = min($matched, $dayCap);
+                $income         = $capped * $rate;
+                $normalCapped   = max(0, $capped - 1);
+
+                $primaryRem   = max(0, $primaryEff   - $normalCapped);
+                $secondaryRem = max(0, $secondaryEff - $normalCapped);
+
+                // Stronger remaining carries; weaker flushes
+                if ($primaryRem >= $secondaryRem) {
+                    [$carryPrimary, $carrySecondary, $flushPrimary, $flushSecondary] =
+                        [$primaryRem, 0, 0, $secondaryRem];
+                } else {
+                    [$carryPrimary, $carrySecondary, $flushPrimary, $flushSecondary] =
+                        [0, $secondaryRem, $primaryRem, 0];
+                }
+
+                [$carryOutLeft,  $carryOutRight,  $flushedLeft,  $flushedRight] = $leftIsPrimary
+                    ? [$carryPrimary, $carrySecondary, $flushPrimary,   $flushSecondary]
+                    : [$carrySecondary, $carryPrimary, $flushSecondary, $flushPrimary];
+            } else {
+                // One side is empty — can't unlock yet; hold all activations
+                $matched = $capped = 0;
+                $income  = 0;
+                $carryOutLeft  = $totalLeft;
+                $carryOutRight = $totalRight;
+                $flushedLeft   = $flushedRight = 0;
+            }
         } else {
-            $carryOutLeft  = 0;
-            $carryOutRight = $totalRight - $capped;
-            $flushedLeft   = max(0, $totalLeft - $capped);
-            $flushedRight  = 0;
+            // ── Subsequent runs: standard 1:1 pair matching ────────────────────────
+            $matched = min($totalLeft, $totalRight);
+            $capped  = min($matched, $dayCap);
+            $income  = $capped * $rate;
+
+            // Stronger leg carries forward; weaker leg excess flushed
+            if ($totalLeft >= $totalRight) {
+                $carryOutLeft  = $totalLeft - $capped;
+                $carryOutRight = 0;
+                $flushedLeft   = 0;
+                $flushedRight  = max(0, $totalRight - $capped);
+            } else {
+                $carryOutLeft  = 0;
+                $carryOutRight = $totalRight - $capped;
+                $flushedLeft   = max(0, $totalLeft - $capped);
+                $flushedRight  = 0;
+            }
         }
 
         DB::transaction(function () use (

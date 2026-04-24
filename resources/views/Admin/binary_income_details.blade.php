@@ -272,12 +272,22 @@
                                 <td class="text-center {{ $log->carry_out_right > 0 ? 'text-warning font-weight-bold' : '' }}">{{ $log->carry_out_right }}</td>
                                 <td class="text-center {{ $log->flushed_left > 0 ? 'text-danger' : '' }}">{{ $log->flushed_left }}</td>
                                 <td class="text-center {{ $log->flushed_right > 0 ? 'text-danger' : '' }}">{{ $log->flushed_right }}</td>
-                                <td>
+                                <td class="text-nowrap">
                                     <button class="btn btn-xs btn-info btn-popup"
                                             data-user="{{ $log->user_id }}"
-                                            data-date="{{ \Carbon\Carbon::parse($log->calc_date)->toDateString() }}">
+                                            data-date="{{ \Carbon\Carbon::parse($log->calc_date)->toDateString() }}"
+                                            data-package-id="{{ $log->package_id }}"
+                                            data-package="{{ $log->package->name ?? $log->package_type }}"
+                                            title="Calculation detail">
                                         <i class="fas fa-search"></i>
                                     </button>
+                                    @if($log->capped_pairs > 0)
+                                    <button class="btn btn-xs btn-success ml-1 btn-pairs"
+                                            data-log="{{ $log->id }}"
+                                            title="Paired users">
+                                        <i class="fas fa-users"></i>
+                                    </button>
+                                    @endif
                                 </td>
                             </tr>
                             @empty
@@ -327,13 +337,15 @@ function confirmClear() {
 
 document.querySelectorAll('.btn-popup').forEach(function (btn) {
     btn.addEventListener('click', function () {
-        const userId = this.dataset.user;
-        const date   = this.dataset.date;
-        document.getElementById('incomeDetailTitle').textContent = 'Detail — ' + date;
+        const userId    = this.dataset.user;
+        const date      = this.dataset.date;
+        const pkg       = this.dataset.package;
+        const packageId = this.dataset.packageId;
+        document.getElementById('incomeDetailTitle').textContent = 'Detail — ' + pkg + ' — ' + date;
         document.getElementById('incomeDetailBody').innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading…</div>';
         $('#incomeDetailModal').modal('show');
 
-        fetch('{{ route('admin.binary_income.popup') }}?user_id=' + userId + '&date=' + date)
+        fetch('{{ route('admin.binary_income.popup') }}?user_id=' + userId + '&date=' + date + '&package_id=' + packageId)
             .then(r => r.json())
             .then(data => {
                 if (data.error) {
@@ -344,7 +356,7 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 const w   = data.wallet || {};
                 document.getElementById('incomeDetailBody').innerHTML = `
                 <div class="row">
-                    <div class="col-md-7">
+                    <div class="col-md-12">
                         <h6 class="text-primary border-bottom pb-1">Pair Calculation — ${date}</h6>
                         <table class="table table-sm table-bordered">
                             <tbody>
@@ -386,33 +398,25 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                         </table>
                     </div>
                     <div class="col-md-5">
-                        <h6 class="text-success border-bottom pb-1">Wallet Status</h6>
-                        <table class="table table-sm table-bordered">
-                            <tbody>
-                                <tr class="table-success">
-                                    <th>Balance</th>
-                                    <td class="text-success font-weight-bold">₹${parseFloat(w.balance || 0).toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
-                                </tr>
-                                <tr><th>Lifetime Earned</th><td>₹${parseFloat(w.total_earned || 0).toLocaleString('en-IN', {minimumFractionDigits:2})}</td></tr>
-                                <tr><th>Total Withdrawn</th><td>₹${parseFloat(w.total_withdrawn || 0).toLocaleString('en-IN', {minimumFractionDigits:2})}</td></tr>
-                                <tr>
-                                    <th>Carry Fwd L</th>
-                                    <td class="${(w.carry_forward_left||0) > 0 ? 'text-warning font-weight-bold' : ''}">${w.carry_forward_left || 0}</td>
-                                </tr>
-                                <tr>
-                                    <th>Carry Fwd R</th>
-                                    <td class="${(w.carry_forward_right||0) > 0 ? 'text-warning font-weight-bold' : ''}">${w.carry_forward_right || 0}</td>
-                                </tr>
-                            </tbody>
-                        </table>
                         <div class="callout callout-info mt-2" style="font-size:12px;">
                             <b>How it worked:</b><br>
                             New L(${log.new_left}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> left<br>
                             New R(${log.new_right}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> right<br>
-                            Min(${log.total_left}, ${log.total_right}) = <b>${log.matched_pairs}</b> matched<br>
+                            ${(() => {
+                                const L = log.total_left, R = log.total_right;
+                                const isFirst = log.carry_in_left === 0 && log.carry_in_right === 0 && log.matched_pairs < Math.min(L, R);
+                                if (isFirst) {
+                                    const leftPrimary = L >= R;
+                                    const primary = leftPrimary ? 'Left' : 'Right';
+                                    const secondary = leftPrimary ? 'Right' : 'Left';
+                                    return `<span class="text-warning">Unlock 2:1 — 2 from ${primary} + 1 from ${secondary} = 1st pair</span><br>` +
+                                           `Remaining: ${leftPrimary ? L-2 : L-1}L vs ${leftPrimary ? R-1 : R-2}R → ${log.matched_pairs - 1} more pair(s)<br>`;
+                                }
+                                return `Min(${L}, ${R}) = <b>${log.matched_pairs}</b> matched<br>`;
+                            })()}
                             Capped at <b>${log.capped_pairs}</b> → ₹<b>${parseFloat(log.income).toLocaleString('en-IN')}</b><br>
-                            ${log.carry_out_left > 0 ? `Left carries <b>${log.carry_out_left}</b> forward` : ''}
-                            ${log.carry_out_right > 0 ? `Right carries <b>${log.carry_out_right}</b> forward` : ''}
+                            ${log.carry_out_left  > 0 ? `Left carries <b>${log.carry_out_left}</b> forward<br>`  : ''}
+                            ${log.carry_out_right > 0 ? `Right carries <b>${log.carry_out_right}</b> forward<br>` : ''}
                             ${(log.flushed_left > 0 || log.flushed_right > 0) ? `<span class="text-danger">Flushed: L${log.flushed_left} R${log.flushed_right}</span>` : ''}
                         </div>
                     </div>
@@ -423,5 +427,109 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
             });
     });
 });
+
+// ── Paired Users Modal ────────────────────────────────────────────────────────
+const pairsModal = new bootstrap.Modal(document.getElementById('pairsModal') || document.createElement('div'));
+
+document.querySelectorAll('.btn-pairs').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const logId = this.dataset.log;
+        document.getElementById('pairsModalBody').innerHTML =
+            '<div class="text-center py-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+        $('#pairsModal').modal('show');
+
+        fetch('{{ url("/admin/binary-income/log") }}/' + logId + '/pairs')
+            .then(r => r.json())
+            .then(data => {
+                const log = data.log;
+                let html = `<div class="row mb-3">
+                    <div class="col-md-4"><b>Date:</b> ${log.date}</div>
+                    <div class="col-md-4"><b>Package:</b> ${log.package}</div>
+                    <div class="col-md-4"><b>Income:</b> <span class="text-success font-weight-bold">₹${log.income}</span></div>
+                </div>`;
+
+                if (log.carry_in_left > 0 || log.carry_in_right > 0) {
+                    html += `<div class="alert alert-warning py-1 mb-3"><i class="fas fa-info-circle"></i>
+                        Carry-in from previous run: <b>${log.carry_in_left}</b> Left, <b>${log.carry_in_right}</b> Right
+                        (from earlier cycles, not listed below)</div>`;
+                }
+
+                function statusBadge(u) {
+                    if (!u) return '';
+                    if (u.status === 'matched')    return '<span class="badge badge-success">Matched</span>';
+                    if (u.status === 'first_sale') return '<span class="badge" style="background:#6f42c1;color:#fff;">First Sale</span>';
+                    if (u.status === 'carry')      return '<span class="badge badge-warning">Carry Fwd</span>';
+                    return '<span class="badge badge-danger">Flushed</span>';
+                }
+                function buildRows(left, right) {
+                    const rows = [];
+                    let li = 0, ri = 0;
+                    while (li < left.length || ri < right.length) {
+                        const l = left[li], r = right[ri];
+                        if (l && l.status === 'first_sale') { rows.push({l, r: null}); li++; }
+                        else if (r && r.status === 'first_sale') { rows.push({l: null, r}); ri++; }
+                        else if (l && r && l.status === 'matched' && r.status === 'matched') { rows.push({l, r}); li++; ri++; }
+                        else if (l) { rows.push({l, r: null}); li++; }
+                        else { rows.push({l: null, r}); ri++; }
+                    }
+                    return rows;
+                }
+
+                const rows = buildRows(data.left, data.right);
+                html += `<table class="table table-sm table-bordered">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>#</th>
+                            <th><i class="fas fa-arrow-left mr-1 text-primary"></i>Left User</th>
+                            <th><i class="fas fa-arrow-right mr-1 text-danger"></i>Right User</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                if (rows.length === 0) {
+                    html += `<tr><td colspan="4" class="text-center text-muted">No activations this run</td></tr>`;
+                }
+                rows.forEach(({l, r}, i) => {
+                    const status = l ? l.status : r.status;
+                    const cls = (status === 'matched') ? 'table-success' : (status === 'first_sale') ? 'table-info' : '';
+                    const leftCell  = l ? `${l.connection||l.id} — ${l.name}<br><small class="text-muted">${new Date(l.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>` : '<span class="text-muted">—</span>';
+                    const rightCell = r ? `${r.connection||r.id} — ${r.name}<br><small class="text-muted">${new Date(r.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>` : '<span class="text-muted">—</span>';
+                    html += `<tr class="${cls}">
+                        <td>${i+1}</td>
+                        <td>${leftCell}</td>
+                        <td>${rightCell}</td>
+                        <td>${statusBadge(l||r)}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+
+                if (log.capped > 0) {
+                    html += `<div class="alert alert-success mt-2 mb-0">
+                        <i class="fas fa-check-circle mr-1"></i>
+                        <b>${log.capped} pair${log.capped>1?'s':''}</b> matched — income of <b>₹${log.income}</b>.</div>`;
+                }
+
+                document.getElementById('pairsModalBody').innerHTML = html;
+            })
+            .catch(() => {
+                document.getElementById('pairsModalBody').innerHTML =
+                    '<div class="alert alert-danger">Failed to load pair details.</div>';
+            });
+    });
+});
 </script>
+
+{{-- Pairs Modal --}}
+<div class="modal fade" id="pairsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success">
+                <h5 class="modal-title text-white"><i class="fas fa-users mr-1"></i> Paired Users Detail</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body" id="pairsModalBody"></div>
+        </div>
+    </div>
+</div>
+
 @endsection

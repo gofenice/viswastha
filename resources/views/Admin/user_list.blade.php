@@ -745,41 +745,78 @@
     <script>
     function changeAcctType(userId, currentLabel) {
         const isPrivilege = currentLabel.includes('Privilege');
-        const action = isPrivilege ? 'demote to Child ID' : 'promote to Privilege ID';
-        Swal.fire({
-            title: 'Change Account Type?',
-            html: 'This will <b>' + action + '</b>.<br>This affects binary pair income eligibility.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: isPrivilege ? '#6c757d' : '#007bff',
-            confirmButtonText: 'Yes, ' + action,
-            cancelButtonText: 'Cancel',
-        }).then(function(result) {
-            if (!result.isConfirmed) return;
-            fetch('{{ route('admin.user.change_account_type') }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify({ user_id: userId })
-            })
+
+        if (!isPrivilege) {
+            // Child → Privilege: simple confirm
+            Swal.fire({
+                title: 'Promote to Privilege ID?',
+                html: 'This will <b>promote to Privilege ID</b>.<br>This affects binary pair income eligibility.',
+                icon: 'warning', showCancelButton: true,
+                confirmButtonColor: '#007bff', confirmButtonText: 'Yes, promote', cancelButtonText: 'Cancel',
+            }).then(result => {
+                if (!result.isConfirmed) return;
+                doChangeAcct(userId, null);
+            });
+            return;
+        }
+
+        // Privilege → fetch children for swap
+        fetch('{{ url("/admin/user") }}/' + userId + '/children-by-pan')
             .then(r => r.json())
             .then(data => {
-                if (data.status === 'success') {
-                    const badge = document.getElementById('badge-' + userId);
-                    if (badge) {
-                        badge.textContent = data.label;
-                        badge.className = 'badge acct-type-badge ' +
-                            (data.new_type == 0 ? 'badge-secondary' : 'badge-primary');
-                        badge.style.fontSize = '12px';
-                    }
-                    Swal.fire({ icon: 'success', title: 'Changed to ' + data.label, timer: 1500, showConfirmButton: false });
-                    setTimeout(() => location.reload(), 1600);
-                } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                // No child IDs available to swap with
+                if (!data.can_swap) {
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Cannot Change',
+                        html: data.has_others
+                            ? `This user's other IDs are all <b>Mother / Privilege</b> accounts.<br>There is no Child ID available to swap with.`
+                            : `No other IDs found for this user. There is no Child ID to swap with.`,
+                        confirmButtonText: 'OK'
+                    });
+                    return;
                 }
+
+                const selectHtml = `<div class="mt-3 text-left">
+                    <label class="font-weight-bold">Swap with a Child ID:</label>
+                    <select id="swapChildSelect" class="form-control mt-1">
+                        <option value="">— Just demote, no swap —</option>
+                        ${data.children.map(c => `<option value="${c.id}">${c.connection} — ${c.name}</option>`).join('')}
+                    </select>
+                </div>`;
+
+                Swal.fire({
+                    title: 'Change Privilege to Child?',
+                    html: `This will <b>demote ${currentLabel} to Child ID</b>.
+                           <br>This affects binary pair income eligibility.
+                           ${selectHtml}`,
+                    icon: 'warning', showCancelButton: true,
+                    confirmButtonColor: '#6c757d', confirmButtonText: 'Yes, change', cancelButtonText: 'Cancel',
+                    preConfirm: () => {
+                        const sel = document.getElementById('swapChildSelect');
+                        return sel ? sel.value : '';
+                    }
+                }).then(result => {
+                    if (!result.isConfirmed) return;
+                    doChangeAcct(userId, result.value || null);
+                });
             });
+    }
+
+    function doChangeAcct(userId, swapWithId) {
+        fetch('{{ route('admin.user.change_account_type') }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            body: JSON.stringify({ user_id: userId, swap_with_id: swapWithId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                Swal.fire({ icon: 'success', title: 'Done!', text: 'Account type updated.', timer: 1500, showConfirmButton: false });
+                setTimeout(() => location.reload(), 1600);
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+            }
         });
     }
     </script>

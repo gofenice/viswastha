@@ -238,6 +238,7 @@ class AdminController extends Controller
         $log = \App\Models\BinaryPairLog::with('user')
             ->where('user_id', $request->user_id)
             ->where('calc_date', $request->date)
+            ->when($request->package_id, fn($q) => $q->where('package_id', $request->package_id))
             ->first();
 
         if (!$log) {
@@ -350,6 +351,90 @@ class AdminController extends Controller
             'pairIncomeTotal', 'sponsorIncomeTotal'
         ));
     }
+
+    public function binaryIncomePairs(int $id)
+    {
+        $log = \App\Models\BinaryPairLog::with('package')->findOrFail($id);
+
+        // Time window: previous log → this log
+        $prevLog = \App\Models\BinaryPairLog::where('user_id', $log->user_id)
+            ->where('package_id', $log->package_id)
+            ->where('id', '<', $log->id)
+            ->orderByDesc('id')
+            ->first();
+
+        $since = $prevLog
+            ? $prevLog->created_at->toDateTimeString()
+            : '2026-04-20 00:00:00';
+        $until = $log->created_at->toDateTimeString();
+
+        $leftChildId  = DB::table('users')->where('parent_id', $log->user_id)->where('position', 'left')->value('id');
+        $rightChildId = DB::table('users')->where('parent_id', $log->user_id)->where('position', 'right')->value('id');
+
+        $leftUsers  = $leftChildId  ? $this->legActivationUsers($leftChildId,  $log->package_id, $since, $until) : [];
+        $rightUsers = $rightChildId ? $this->legActivationUsers($rightChildId, $log->package_id, $since, $until) : [];
+
+        $capped       = (int) $log->capped_pairs;
+        $isFirstRun   = !$prevLog;
+        $leftPrimary  = $isFirstRun && ($log->total_left >= $log->total_right);
+        $rightPrimary = $isFirstRun && ($log->total_right > $log->total_left);
+
+        // Primary side (first run): index 0 = matched, index 1 = first_sale, 2..capped = matched
+        // Secondary / subsequent runs: index < capped = matched, rest = carry or flushed
+        foreach ($leftUsers as $i => $u) {
+            if ($leftPrimary) {
+                if ($i === 1) $u->status = 'first_sale';
+                elseif ($i <= $capped) $u->status = 'matched';
+                else $u->status = $log->carry_out_left > 0 ? 'carry' : 'flushed';
+            } else {
+                $u->status = $i < $capped ? 'matched' : ($log->carry_out_left > 0 ? 'carry' : 'flushed');
+            }
+        }
+        foreach ($rightUsers as $i => $u) {
+            if ($rightPrimary) {
+                if ($i === 1) $u->status = 'first_sale';
+                elseif ($i <= $capped) $u->status = 'matched';
+                else $u->status = $log->carry_out_right > 0 ? 'carry' : 'flushed';
+            } else {
+                $u->status = $i < $capped ? 'matched' : ($log->carry_out_right > 0 ? 'carry' : 'flushed');
+            }
+        }
+
+        return response()->json([
+            'log'        => [
+                'date'        => \Carbon\Carbon::parse($log->calc_date)->format('d M Y'),
+                'package'     => $log->package->name ?? $log->package_type,
+                'capped'      => $capped,
+                'income'      => number_format($log->income, 2),
+                'carry_in_left'  => $log->carry_in_left,
+                'carry_in_right' => $log->carry_in_right,
+            ],
+            'left'       => $leftUsers,
+            'right'      => $rightUsers,
+        ]);
+    }
+
+    private function legActivationUsers(int $childId, int $packageId, string $since, string $until): array
+    {
+        return DB::select("
+            WITH RECURSIVE subtree AS (
+                SELECT id FROM users WHERE id = ?
+                UNION ALL
+                SELECT u.id FROM users u
+                INNER JOIN subtree s ON u.parent_id = s.id
+            )
+            SELECT u.id, u.name, u.connection, up.created_at AS activated_at
+            FROM user_packages up
+            JOIN users u ON u.id = up.user_id
+            WHERE up.user_id IN (SELECT id FROM subtree)
+              AND up.package_id = ?
+              AND up.status = 1
+              AND up.created_at > ?
+              AND up.created_at <= ?
+            ORDER BY up.created_at
+        ", [$childId, $packageId, $since, $until]);
+    }
+
     public function directy_income_details()
     {
         return view('Admin/directy_income_details');
@@ -2930,11 +3015,31 @@ class AdminController extends Controller
         return response()->json(['status' => 'success', 'label' => $label, 'mother_id' => $motherid]);
     }
 
+    public function childrenByPan(int $id)
+    {
+        $user = User::findOrFail($id);
+
+        $hasPan = $user->pan_card_no && strtoupper($user->pan_card_no) !== 'STORE';
+
+        $base = DB::table('users')
+            ->where('name', $user->name)
+            ->where('id', '!=', $id);
+        if ($hasPan) $base->where('pan_card_no', $user->pan_card_no);
+
+        $allOthers    = (clone $base)->get(['id', 'name', 'connection', 'mother_id']);
+        $childrenOnly = $allOthers->where('mother_id', 0)->values();
+
+        return response()->json([
+            'children'    => $childrenOnly,
+            'has_others'  => $allOthers->isNotEmpty(),
+            'can_swap'    => $childrenOnly->isNotEmpty(),
+        ]);
+    }
+
     public function changeAccountType(Request $request)
     {
         $user = User::findOrFail($request->user_id);
 
-        // Mother ID can never be changed
         if ($user->mother_id == 1) {
             return response()->json(['status' => 'error', 'message' => 'Mother ID cannot be changed.']);
         }
@@ -2942,7 +3047,7 @@ class AdminController extends Controller
         $pan = $user->pan_card_no;
 
         if ($user->mother_id == 0) {
-            // Child → promote to Privilege: find lowest free slot (2 or 3)
+            // Child → promote to Privilege: find lowest free slot
             $slot2Taken = DB::table('users')->where('pan_card_no', $pan)->where('mother_id', 2)->exists();
             $slot3Taken = DB::table('users')->where('pan_card_no', $pan)->where('mother_id', 3)->exists();
 
@@ -2953,18 +3058,26 @@ class AdminController extends Controller
             } else {
                 return response()->json(['status' => 'error', 'message' => 'Both Privilege slots are taken. Demote one first.']);
             }
+            $user->save();
+        } elseif ($request->swap_with_id) {
+            // Privilege ↔ Child swap
+            $child = User::findOrFail($request->swap_with_id);
+            if ($child->pan_card_no !== $pan || $child->mother_id != 0) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid swap target.']);
+            }
+            $privilegeSlot  = $user->mother_id;
+            $user->mother_id  = 0;
+            $child->mother_id = $privilegeSlot;
+            $user->save();
+            $child->save();
         } else {
-            // Privilege → demote to Child
+            // Privilege → Child (no swap)
             $user->mother_id = 0;
+            $user->save();
         }
 
-        $user->save();
-
         $label = match($user->mother_id) {
-            1 => 'Mother ID',
-            2 => 'Privilege 1',
-            3 => 'Privilege 2',
-            default => 'Child ID',
+            1 => 'Mother ID', 2 => 'Privilege 1', 3 => 'Privilege 2', default => 'Child ID',
         };
 
         return response()->json(['status' => 'success', 'new_type' => $user->mother_id, 'label' => $label]);
