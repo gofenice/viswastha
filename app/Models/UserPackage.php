@@ -27,6 +27,8 @@ class UserPackage extends Model
         'pin_id',
         'add_by',
         'status',
+        'deactivation_reason',
+        'upgraded_from_package_id',
     ];
 
     /**

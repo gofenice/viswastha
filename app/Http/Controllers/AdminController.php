@@ -467,11 +467,13 @@ class AdminController extends Controller
             'amount'                      => $validated['packageAmount'],
             'binary_commission'           => $validated['binary_commission'],
             'sponsor_commission'          => $validated['sponsor_commission'],
-            'sponsor_eligible_package_ids'=> array_filter(array_map('intval', $request->input('sponsor_eligible_package_ids', []))),
-            'daily_pair_cap'              => $validated['daily_pair_cap'],
-            'package_code'                => $validated['packageCategory'],
-            'package_cat'                 => $validated['packageCat'],
-            'status'                      => $validated['status'],
+            'sponsor_eligible_package_ids'  => array_filter(array_map('intval', $request->input('sponsor_eligible_package_ids', []))),
+            'auto_upgrade_count'            => $request->input('auto_upgrade_count') ?: null,
+            'auto_upgrade_to_package_id'    => $request->input('auto_upgrade_to_package_id') ?: null,
+            'daily_pair_cap'                => $validated['daily_pair_cap'],
+            'package_code'                  => $validated['packageCategory'],
+            'package_cat'                   => $validated['packageCat'],
+            'status'                        => $validated['status'],
         ]);
         return redirect()->route('package')->with('success', 'Added Package Successfully.');
     }
@@ -492,9 +494,11 @@ class AdminController extends Controller
             'amount'                      => $validated['amount'],
             'binary_commission'           => $validated['binary_commission'],
             'sponsor_commission'          => $validated['sponsor_commission'],
-            'sponsor_eligible_package_ids'=> array_filter(array_map('intval', $request->input('sponsor_eligible_package_ids', []))),
-            'daily_pair_cap'              => $validated['daily_pair_cap'],
-            'status'                      => $validated['status'],
+            'sponsor_eligible_package_ids'  => array_filter(array_map('intval', $request->input('sponsor_eligible_package_ids', []))),
+            'auto_upgrade_count'            => $request->input('auto_upgrade_count') ?: null,
+            'auto_upgrade_to_package_id'    => $request->input('auto_upgrade_to_package_id') ?: null,
+            'daily_pair_cap'                => $validated['daily_pair_cap'],
+            'status'                        => $validated['status'],
         ]);
         return redirect()->route('package')->with('successchange', 'Package updated successfully.');
     }
@@ -1313,6 +1317,8 @@ class AdminController extends Controller
             $this->privilegeIncomeAdd($user->id, $request->package_id);
             $this->boardIncomeAdd($user->id, $request->package_id);
             $this->executiveIncomeAdd($user->id, $request->package_id);
+            $this->creditBinarySponsorIncome($user->id, $request->package_id);
+            $this->checkAutoUpgrade($user->id, $request->package_id);
         }
         return redirect()->route('/')->with('successs', "User Name : <strong>{$request->user_code}</strong><br> Password : <strong>{$request->password}</strong>");
     }
@@ -1622,6 +1628,8 @@ class AdminController extends Controller
         $this->royaltyIncomeAdd($request->userid, $request->package_id);
         // Credit sponsor commission if configured on the package (dynamic, package-code-agnostic)
         $this->creditBinarySponsorIncome($request->userid, $request->package_id);
+        // Auto-upgrade if user has reached the threshold for this package
+        $this->checkAutoUpgrade($request->userid, $request->package_id);
 
         // $calculationController = new CalculationController();
         // $calculationController->rank_income();
@@ -6640,6 +6648,45 @@ class AdminController extends Controller
                 'package_id'   => $packageId,
             ]
         );
+    }
+
+    /**
+     * Check if user has reached the auto-upgrade threshold for the given package.
+     * If so, deactivate those packages and activate the target upgrade package.
+     */
+    private function checkAutoUpgrade(int $userId, int $packageId): void
+    {
+        $package = \App\Models\Package::find($packageId);
+        if (!$package || !$package->auto_upgrade_count || !$package->auto_upgrade_to_package_id) return;
+
+        $activeCount = \App\Models\UserPackage::where('user_id', $userId)
+            ->where('package_id', $packageId)
+            ->where('status', 1)
+            ->count();
+
+        if ($activeCount < $package->auto_upgrade_count) return;
+
+        // Deactivate all current packages of this type, recording why
+        \App\Models\UserPackage::where('user_id', $userId)
+            ->where('package_id', $packageId)
+            ->where('status', 1)
+            ->update([
+                'status'              => 0,
+                'deactivation_reason' => 'auto_upgrade_to_' . $package->auto_upgrade_to_package_id,
+            ]);
+
+        // Activate the upgrade package, recording what it was upgraded from
+        \App\Models\UserPackage::create([
+            'user_id'                  => $userId,
+            'package_id'               => $package->auto_upgrade_to_package_id,
+            'pin_id'                   => null,
+            'add_by'                   => $userId,
+            'status'                   => 1,
+            'upgraded_from_package_id' => $packageId,
+        ]);
+
+        // Credit sponsor income for the upgrade package as well
+        $this->creditBinarySponsorIncome($userId, $package->auto_upgrade_to_package_id);
     }
 
     public function getUserPackageDetails(Request $request)

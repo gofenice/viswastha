@@ -15,6 +15,8 @@ class Package extends Model
         'binary_commission',
         'sponsor_commission',
         'sponsor_eligible_package_ids',
+        'auto_upgrade_count',
+        'auto_upgrade_to_package_id',
         'daily_pair_cap',
         'package_code',
         'package_cat',

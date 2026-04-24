@@ -95,6 +95,25 @@
                         </div>
                     </div>
                     <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">Auto-Upgrade After (count)</label>
+                        <div class="col-sm-8">
+                            <input type="number" min="1" step="1" class="form-control" name="auto_upgrade_count" placeholder="e.g. 2 (leave blank to disable)">
+                            <small class="text-muted">Number of this package a user must hold to trigger auto-upgrade</small>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">Auto-Upgrade To Package</label>
+                        <div class="col-sm-8">
+                            <select name="auto_upgrade_to_package_id" class="form-control">
+                                <option value="">— No auto-upgrade —</option>
+                                @foreach($packages as $pkg)
+                                    <option value="{{ $pkg->id }}">{{ $pkg->name }}</option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted">Package to automatically upgrade to when count is reached</small>
+                        </div>
+                    </div>
+                    <div class="form-group row">
                         <label for="daily_pair_cap" class="col-sm-4 col-form-label">Daily Pair Cap</label>
                         <div class="col-sm-8">
                             <input type="number" min="0" step="1" class="form-control" id="daily_pair_cap" name="daily_pair_cap"
@@ -195,7 +214,7 @@
                                     <td>
                                         <button class="btn btn-success btn-sm" data-toggle="modal"
                                             data-target="#editPackageModal"
-                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}', '{{ $package->binary_commission }}', '{{ $package->sponsor_commission }}', '{{ $package->daily_pair_cap }}', {{ json_encode($package->sponsor_eligible_package_ids ?? []) }})">
+                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}', '{{ $package->binary_commission }}', '{{ $package->sponsor_commission }}', '{{ $package->daily_pair_cap }}', {{ json_encode($package->sponsor_eligible_package_ids ?? []) }}, '{{ $package->auto_upgrade_count }}', '{{ $package->auto_upgrade_to_package_id }}')">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         {{-- <button class="btn btn-danger btn-sm" data-toggle="modal"
@@ -254,6 +273,20 @@
                                     @endforeach
                                 </select>
                                 <small class="text-muted">Sponsor also qualifies if they hold any of these packages</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Auto-Upgrade After (count)</label>
+                                <input type="number" min="1" step="1" class="form-control" id="editAutoUpgradeCount" name="auto_upgrade_count" placeholder="Leave blank to disable">
+                                <small class="text-muted">Number of this package to trigger auto-upgrade</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Auto-Upgrade To Package</label>
+                                <select name="auto_upgrade_to_package_id" id="editAutoUpgradeTo" class="form-control">
+                                    <option value="">— No auto-upgrade —</option>
+                                    @foreach($packages as $pkg)
+                                        <option value="{{ $pkg->id }}">{{ $pkg->name }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label for="editDailyPairCap">Daily Pair Cap</label>
@@ -316,14 +349,15 @@
         </script>
     @endif
     <script>
-        function editPackage(id, name, amount, status, binaryCommission, sponsorCommission, dailyPairCap, eligibleIds) {
+        function editPackage(id, name, amount, status, binaryCommission, sponsorCommission, dailyPairCap, eligibleIds, autoUpgradeCount, autoUpgradeTo) {
             $('#editPackageModal #packageId').val(id);
             $('#editPackageModal #editName').val(name);
             $('#editPackageModal #editAmount').val(amount);
             $('#editPackageModal #editBinaryCommission').val(binaryCommission);
             $('#editPackageModal #editSponsorCommission').val(sponsorCommission);
             $('#editPackageModal #editDailyPairCap').val(dailyPairCap);
-            // Pre-select cross-eligible packages (exclude current package from its own list)
+            $('#editPackageModal #editAutoUpgradeCount').val(autoUpgradeCount || '');
+            $('#editPackageModal #editAutoUpgradeTo').val(autoUpgradeTo || '');
             const sel = document.getElementById('editSponsorEligible');
             Array.from(sel.options).forEach(opt => {
                 opt.selected = eligibleIds.includes(parseInt(opt.value));
