@@ -14,10 +14,15 @@ class Package extends Model
         'amount',
         'binary_commission',
         'sponsor_commission',
+        'sponsor_eligible_package_ids',
         'daily_pair_cap',
         'package_code',
         'package_cat',
         'status',
+    ];
+
+    protected $casts = [
+        'sponsor_eligible_package_ids' => 'array',
     ];
 
     

@@ -84,6 +84,17 @@
                         </div>
                     </div>
                     <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">Cross-Eligible Sponsor Packages</label>
+                        <div class="col-sm-8">
+                            <select name="sponsor_eligible_package_ids[]" multiple class="form-control" style="height:auto;">
+                                @foreach($packages as $pkg)
+                                    <option value="{{ $pkg->id }}">{{ $pkg->name }}</option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted">Sponsor also qualifies if they hold any of these packages (leave empty = same package only)</small>
+                        </div>
+                    </div>
+                    <div class="form-group row">
                         <label for="daily_pair_cap" class="col-sm-4 col-form-label">Daily Pair Cap</label>
                         <div class="col-sm-8">
                             <input type="number" min="0" step="1" class="form-control" id="daily_pair_cap" name="daily_pair_cap"
@@ -184,7 +195,7 @@
                                     <td>
                                         <button class="btn btn-success btn-sm" data-toggle="modal"
                                             data-target="#editPackageModal"
-                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}', '{{ $package->binary_commission }}', '{{ $package->sponsor_commission }}', '{{ $package->daily_pair_cap }}')">
+                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}', '{{ $package->binary_commission }}', '{{ $package->sponsor_commission }}', '{{ $package->daily_pair_cap }}', {{ json_encode($package->sponsor_eligible_package_ids ?? []) }})">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         {{-- <button class="btn btn-danger btn-sm" data-toggle="modal"
@@ -234,6 +245,15 @@
                                 <label for="editSponsorCommission">Sponsor Commission (₹)</label>
                                 <input type="number" step="0.01" min="0" class="form-control" id="editSponsorCommission" name="sponsor_commission" required>
                                 <small class="text-muted">₹ credited to direct sponsor on activation</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Cross-Eligible Sponsor Packages</label>
+                                <select name="sponsor_eligible_package_ids[]" id="editSponsorEligible" multiple class="form-control" style="height:auto;">
+                                    @foreach($packages as $pkg)
+                                        <option value="{{ $pkg->id }}">{{ $pkg->name }}</option>
+                                    @endforeach
+                                </select>
+                                <small class="text-muted">Sponsor also qualifies if they hold any of these packages</small>
                             </div>
                             <div class="form-group">
                                 <label for="editDailyPairCap">Daily Pair Cap</label>
@@ -296,13 +316,18 @@
         </script>
     @endif
     <script>
-        function editPackage(id, name, amount, status, binaryCommission, sponsorCommission, dailyPairCap) {
+        function editPackage(id, name, amount, status, binaryCommission, sponsorCommission, dailyPairCap, eligibleIds) {
             $('#editPackageModal #packageId').val(id);
             $('#editPackageModal #editName').val(name);
             $('#editPackageModal #editAmount').val(amount);
             $('#editPackageModal #editBinaryCommission').val(binaryCommission);
             $('#editPackageModal #editSponsorCommission').val(sponsorCommission);
             $('#editPackageModal #editDailyPairCap').val(dailyPairCap);
+            // Pre-select cross-eligible packages (exclude current package from its own list)
+            const sel = document.getElementById('editSponsorEligible');
+            Array.from(sel.options).forEach(opt => {
+                opt.selected = eligibleIds.includes(parseInt(opt.value));
+            });
             if (status == 1) {
                 $('#editPackageModal #status_active').prop('checked', true);
             } else {

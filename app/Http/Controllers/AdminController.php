@@ -463,14 +463,15 @@ class AdminController extends Controller
             'packageCat'         => 'required',
         ]);
         Package::create([
-            'name'               => $validated['packageName'],
-            'amount'             => $validated['packageAmount'],
-            'binary_commission'  => $validated['binary_commission'],
-            'sponsor_commission' => $validated['sponsor_commission'],
-            'daily_pair_cap'     => $validated['daily_pair_cap'],
-            'package_code'       => $validated['packageCategory'],
-            'package_cat'        => $validated['packageCat'],
-            'status'             => $validated['status'],
+            'name'                        => $validated['packageName'],
+            'amount'                      => $validated['packageAmount'],
+            'binary_commission'           => $validated['binary_commission'],
+            'sponsor_commission'          => $validated['sponsor_commission'],
+            'sponsor_eligible_package_ids'=> array_filter(array_map('intval', $request->input('sponsor_eligible_package_ids', []))),
+            'daily_pair_cap'              => $validated['daily_pair_cap'],
+            'package_code'                => $validated['packageCategory'],
+            'package_cat'                 => $validated['packageCat'],
+            'status'                      => $validated['status'],
         ]);
         return redirect()->route('package')->with('success', 'Added Package Successfully.');
     }
@@ -487,12 +488,13 @@ class AdminController extends Controller
         ]);
         $package = Package::findOrFail($request->input('id'));
         $package->update([
-            'name'               => $validated['name'],
-            'amount'             => $validated['amount'],
-            'binary_commission'  => $validated['binary_commission'],
-            'sponsor_commission' => $validated['sponsor_commission'],
-            'daily_pair_cap'     => $validated['daily_pair_cap'],
-            'status'             => $validated['status'],
+            'name'                        => $validated['name'],
+            'amount'                      => $validated['amount'],
+            'binary_commission'           => $validated['binary_commission'],
+            'sponsor_commission'          => $validated['sponsor_commission'],
+            'sponsor_eligible_package_ids'=> array_filter(array_map('intval', $request->input('sponsor_eligible_package_ids', []))),
+            'daily_pair_cap'              => $validated['daily_pair_cap'],
+            'status'                      => $validated['status'],
         ]);
         return redirect()->route('package')->with('successchange', 'Package updated successfully.');
     }
@@ -6617,9 +6619,10 @@ class AdminController extends Controller
         $amount = (float) $package->sponsor_commission;
         if ($amount <= 0) return;
 
-        // Sponsor must hold an active package of the same type to receive commission
+        // Sponsor must hold an active package of the same type OR any cross-eligible package
+        $eligibleIds = array_merge([$packageId], $package->sponsor_eligible_package_ids ?? []);
         $sponsorHasPackage = \App\Models\UserPackage::where('user_id', $sponsorId)
-            ->where('package_id', $packageId)
+            ->whereIn('package_id', $eligibleIds)
             ->where('status', 1)
             ->exists();
         if (!$sponsorHasPackage) return;
