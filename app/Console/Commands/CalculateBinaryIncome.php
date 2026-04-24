@@ -97,6 +97,10 @@ class CalculateBinaryIncome extends Command
         $rate   = (float) $package->binary_commission;
         $dayCap = (int)   $package->daily_pair_cap;
 
+        if ($rate <= 0 || $dayCap <= 0) {
+            return; // Package has no binary income (e.g. Prime) — skip entirely
+        }
+
         if (!$lastLog) {
             // ── First-run "2:1" unlock rule ────────────────────────────────────────
             // Primary side (more activations, or LEFT if equal) contributes 2.
