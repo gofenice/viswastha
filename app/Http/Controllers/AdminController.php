@@ -2128,6 +2128,8 @@ class AdminController extends Controller
             $amount = 50;
         } elseif ($package->package_code === 'premium_package' && $package->package_cat === 1) {
             $amount = 100;
+        } else {
+            return; // Package has no royalty income configured
         }
 
         RoyaltyIncomeWallet::create([
