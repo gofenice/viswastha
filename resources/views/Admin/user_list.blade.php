@@ -67,11 +67,6 @@
                                     @else
                                         <span class="badge badge-secondary acct-type-badge" id="badge-{{ $user->id }}" style="font-size:12px;">Child ID</span>
                                         <br><small class="text-danger">No pair income</small>
-                                        <br>
-                                        <button class="btn btn-xs btn-outline-primary mt-1"
-                                                onclick="changeAcctType({{ $user->id }}, 'Child ID')">
-                                            <i class="fas fa-arrow-up"></i> Promote
-                                        </button>
                                     @endif
                                 </td>
                                 <td>{{ strtoupper($user->pan_card_no ?? '') === 'STORE' ? '—' : ($user->pan_card_no ?? '—') }}</td>
@@ -745,20 +740,6 @@
     <script>
     function changeAcctType(userId, currentLabel) {
         const isPrivilege = currentLabel.includes('Privilege');
-
-        if (!isPrivilege) {
-            // Child → Privilege: simple confirm
-            Swal.fire({
-                title: 'Promote to Privilege ID?',
-                html: 'This will <b>promote to Privilege ID</b>.<br>This affects binary pair income eligibility.',
-                icon: 'warning', showCancelButton: true,
-                confirmButtonColor: '#007bff', confirmButtonText: 'Yes, promote', cancelButtonText: 'Cancel',
-            }).then(result => {
-                if (!result.isConfirmed) return;
-                doChangeAcct(userId, null);
-            });
-            return;
-        }
 
         // Privilege → fetch children for swap
         fetch('{{ url("/admin/user") }}/' + userId + '/children-by-pan')
