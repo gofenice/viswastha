@@ -488,25 +488,79 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     return rows;
                 }
 
-                const rows = buildRows(data.left, data.right);
+                // ── Build prime pair rows (grouped per matched pair) ─────────
+                const primePairRows = [];
+                if (data.has_prime) {
+                    const totalPrimeL = data.left_prime.length  + (log.prime_carry_in_left  || 0);
+                    const totalPrimeR = data.right_prime.length + (log.prime_carry_in_right || 0);
+                    const equivL = Math.floor(totalPrimeL / 2);
+                    const equivR = Math.floor(totalPrimeR / 2);
+                    const primePairs = Math.min(equivL, equivR);
+                    let lIdx = 0, rIdx = 0;
+
+                    if (log.is_first_run && primePairs >= 1) {
+                        // First-sale 2:1 rule: primary side contributes 2 equivs (4 prime),
+                        // secondary contributes 1 equiv (2 prime) → all consumed in 1 row.
+                        const leftIsPrimary = equivL >= equivR;
+                        const leftPrimeForPair  = (leftIsPrimary  ? 2 : 1) * 2;
+                        const rightPrimeForPair = (leftIsPrimary  ? 1 : 2) * 2;
+                        const leftUsers  = data.left_prime.slice(lIdx,  lIdx  + leftPrimeForPair);  lIdx  += leftPrimeForPair;
+                        const rightUsers = data.right_prime.slice(rIdx, rIdx + rightPrimeForPair); rIdx += rightPrimeForPair;
+                        primePairRows.push({ leftUsers, rightUsers, matched: true });
+
+                        // Any additional pairs after the first-sale pair: 2 prime per side
+                        for (let p = 1; p < primePairs; p++) {
+                            const lu = data.left_prime.slice(lIdx,  lIdx  + 2); lIdx  += 2;
+                            const ru = data.right_prime.slice(rIdx, rIdx + 2); rIdx += 2;
+                            primePairRows.push({ leftUsers: lu, rightUsers: ru, matched: true });
+                        }
+                    } else {
+                        // Subsequent runs: 2 prime per side per matched pair
+                        for (let p = 0; p < primePairs; p++) {
+                            const lu = data.left_prime.slice(lIdx,  lIdx  + 2); lIdx  += 2;
+                            const ru = data.right_prime.slice(rIdx, rIdx + 2); rIdx += 2;
+                            primePairRows.push({ leftUsers: lu, rightUsers: ru, matched: true });
+                        }
+                    }
+
+                    // Remaining prime users that couldn't pair (carry-out or flushed)
+                    const leftRem  = data.left_prime.slice(lIdx);
+                    const rightRem = data.right_prime.slice(rIdx);
+                    if (leftRem.length || rightRem.length) {
+                        const isCarry = (log.prime_carry_out_left > 0 || log.prime_carry_out_right > 0);
+                        primePairRows.push({ leftUsers: leftRem, rightUsers: rightRem, matched: false, carry: isCarry });
+                    }
+                }
+
+                const fmtUser = u => `${u.connection||u.id} — ${u.name}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>`;
+                const fmtPrimeUsers = arr => arr.length
+                    ? arr.map(u => `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;margin:1px 0;display:inline-block;">${u.connection||u.id}</span> ${u.name}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} · Prime</small>`).join('<hr style="margin:3px 0;">')
+                    : '<span class="text-muted">—</span>';
+
+                const premiumRows = buildRows(data.left, data.right);
+                const totalRows   = premiumRows.length + primePairRows.length;
+
                 html += `<table class="table table-sm table-bordered">
                     <thead class="thead-dark">
                         <tr>
                             <th>#</th>
-                            <th><i class="fas fa-arrow-left mr-1 text-primary"></i>Left User</th>
-                            <th><i class="fas fa-arrow-right mr-1 text-danger"></i>Right User</th>
+                            <th><i class="fas fa-arrow-left mr-1 text-primary"></i>Left</th>
+                            <th><i class="fas fa-arrow-right mr-1 text-danger"></i>Right</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>`;
-                if (rows.length === 0) {
+
+                if (totalRows === 0) {
                     html += `<tr><td colspan="4" class="text-center text-muted">No activations this run</td></tr>`;
                 }
-                rows.forEach(({l, r}, i) => {
+
+                // Premium pair rows
+                premiumRows.forEach(({l, r}, i) => {
                     const status = l ? l.status : r.status;
                     const cls = (status === 'matched') ? 'table-success' : (status === 'first_sale') ? 'table-info' : '';
-                    const leftCell  = l ? `${l.connection||l.id} — ${l.name}<br><small class="text-muted">${new Date(l.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>` : '<span class="text-muted">—</span>';
-                    const rightCell = r ? `${r.connection||r.id} — ${r.name}<br><small class="text-muted">${new Date(r.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>` : '<span class="text-muted">—</span>';
+                    const leftCell  = l ? fmtUser(l) : '<span class="text-muted">—</span>';
+                    const rightCell = r ? fmtUser(r) : '<span class="text-muted">—</span>';
                     html += `<tr class="${cls}">
                         <td>${i+1}</td>
                         <td>${leftCell}</td>
@@ -514,63 +568,30 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                         <td>${statusBadge(l||r)}</td>
                     </tr>`;
                 });
+
+                // Prime pair rows (inline, same table)
+                primePairRows.forEach(({leftUsers, rightUsers, matched, carry}, i) => {
+                    const rowNum = premiumRows.length + i + 1;
+                    const cls    = matched ? 'table-success' : (carry ? 'table-warning' : '');
+                    const badge  = matched
+                        ? `<span class="badge badge-success">Matched</span> <span class="badge" style="background:#fd7e14;color:#fff;">Prime</span>`
+                        : (carry
+                            ? `<span class="badge badge-warning">Carry Fwd</span> <span class="badge" style="background:#fd7e14;color:#fff;">Prime</span>`
+                            : `<span class="badge badge-danger">Flushed</span> <span class="badge" style="background:#fd7e14;color:#fff;">Prime</span>`);
+                    html += `<tr class="${cls}">
+                        <td>${rowNum}</td>
+                        <td>${fmtPrimeUsers(leftUsers)}</td>
+                        <td>${fmtPrimeUsers(rightUsers)}</td>
+                        <td>${badge}</td>
+                    </tr>`;
+                });
+
                 html += `</tbody></table>`;
 
                 if (log.capped > 0) {
                     html += `<div class="alert alert-success mt-2 mb-0">
                         <i class="fas fa-check-circle mr-1"></i>
                         <b>${log.capped} pair${log.capped>1?'s':''}</b> matched — income of <b>₹${log.income}</b>.</div>`;
-                }
-
-                // ── Prime contributions section ───────────────────────────────
-                if (data.has_prime && (data.left_prime.length > 0 || data.right_prime.length > 0 || log.prime_carry_in_left > 0 || log.prime_carry_in_right > 0)) {
-                    const totalPrimeL = data.left_prime.length  + log.prime_carry_in_left;
-                    const totalPrimeR = data.right_prime.length + log.prime_carry_in_right;
-                    const equivL = Math.floor(totalPrimeL / 2);
-                    const equivR = Math.floor(totalPrimeR / 2);
-
-                    html += `<div class="card mt-3 border-warning">
-                        <div class="card-header bg-warning py-1">
-                            <b><i class="fas fa-exchange-alt mr-1"></i>Prime → Premium Conversion</b>
-                            <span class="float-right text-dark" style="font-size:12px;">
-                                L: ${totalPrimeL} prime → <b>${equivL} premium equiv</b> &nbsp;|&nbsp;
-                                R: ${totalPrimeR} prime → <b>${equivR} premium equiv</b>
-                                ${(log.prime_carry_out_left > 0 || log.prime_carry_out_right > 0)
-                                    ? ` &nbsp;|&nbsp; <span class="text-dark">Carry out: L${log.prime_carry_out_left} R${log.prime_carry_out_right}</span>`
-                                    : ''}
-                            </span>
-                        </div>
-                        <div class="card-body p-0">
-                            <table class="table table-sm table-bordered mb-0">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>#</th>
-                                        <th><i class="fas fa-arrow-left mr-1 text-primary"></i>Left Prime Activations</th>
-                                        <th><i class="fas fa-arrow-right mr-1 text-danger"></i>Right Prime Activations</th>
-                                    </tr>
-                                </thead>
-                                <tbody>`;
-
-                    const maxRows = Math.max(data.left_prime.length, data.right_prime.length);
-                    if (maxRows === 0) {
-                        html += `<tr><td colspan="3" class="text-center text-muted">No new prime activations this run (carry-in only)</td></tr>`;
-                    }
-                    for (let i = 0; i < maxRows; i++) {
-                        const lp = data.left_prime[i];
-                        const rp = data.right_prime[i];
-                        const isPaired = i % 2 === 1; // every 2 primes = 1 pair
-                        const rowCls = (i < 2 * Math.min(equivL, equivR)) ? 'table-success' : '';
-                        const fmtUser = u => u
-                            ? `${u.connection||u.id} — ${u.name}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} · ${u.package_name||'Prime'}</small>`
-                            : '<span class="text-muted">—</span>';
-                        html += `<tr class="${rowCls}">
-                            <td>${i+1}</td>
-                            <td>${fmtUser(lp)}</td>
-                            <td>${fmtUser(rp)}</td>
-                        </tr>`;
-                    }
-
-                    html += `</tbody></table></div></div>`;
                 }
 
                 document.getElementById('pairsModalBody').innerHTML = html;
