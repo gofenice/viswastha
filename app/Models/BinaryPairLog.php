@@ -13,6 +13,7 @@ class BinaryPairLog extends Model
         'matched_pairs', 'capped_pairs', 'income',
         'carry_out_left', 'carry_out_right',
         'flushed_left', 'flushed_right',
+        'prime_carry_out_left', 'prime_carry_out_right',
     ];
 
     public function package()

@@ -79,6 +79,40 @@ class CalculateBinaryIncome extends Command
         $newLeft  = $this->legActivationsSince($userId, 'left',  $since, $package->id);
         $newRight = $this->legActivationsSince($userId, 'right', $since, $package->id);
 
+        // Prime → premium conversion: find prime packages that auto-upgrade to this premium package
+        $primeCarryOutLeft  = 0;
+        $primeCarryOutRight = 0;
+
+        if ($package->package_code === 'premium_package') {
+            $primePackageIds = DB::table('packages')
+                ->where('auto_upgrade_to_package_id', $package->id)
+                ->where('package_code', 'prime_package')
+                ->where('status', 1)
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($primePackageIds)) {
+                $primeCarryLeft  = $lastLog ? ($lastLog->prime_carry_out_left  ?? 0) : 0;
+                $primeCarryRight = $lastLog ? ($lastLog->prime_carry_out_right ?? 0) : 0;
+
+                $newPrimeLeft  = 0;
+                $newPrimeRight = 0;
+                foreach ($primePackageIds as $primeId) {
+                    $newPrimeLeft  += $this->legActivationsSince($userId, 'left',  $since, $primeId);
+                    $newPrimeRight += $this->legActivationsSince($userId, 'right', $since, $primeId);
+                }
+
+                $totalPrimeLeft  = $newPrimeLeft  + $primeCarryLeft;
+                $totalPrimeRight = $newPrimeRight + $primeCarryRight;
+
+                // 2 prime = 1 premium equivalent; leftover carries to next run
+                $newLeft  += intdiv($totalPrimeLeft,  2);
+                $newRight += intdiv($totalPrimeRight, 2);
+                $primeCarryOutLeft  = $totalPrimeLeft  % 2;
+                $primeCarryOutRight = $totalPrimeRight % 2;
+            }
+        }
+
         // Nothing new to process
         if ($newLeft === 0 && $newRight === 0) {
             return;
@@ -87,9 +121,17 @@ class CalculateBinaryIncome extends Command
         $totalLeft  = $newLeft  + $carryLeft;
         $totalRight = $newRight + $carryRight;
 
-        // First income unlock: need at least 3 total lifetime activations across both legs
+        // First income unlock: need at least 3 total lifetime premium-equivalent activations
         $lifetimeLeft  = $this->legTotalCount($userId, 'left',  $package->id);
         $lifetimeRight = $this->legTotalCount($userId, 'right', $package->id);
+
+        if ($package->package_code === 'premium_package' && !empty($primePackageIds ?? [])) {
+            foreach ($primePackageIds as $primeId) {
+                $lifetimeLeft  += intdiv($this->legTotalCount($userId, 'left',  $primeId), 2);
+                $lifetimeRight += intdiv($this->legTotalCount($userId, 'right', $primeId), 2);
+            }
+        }
+
         if (($lifetimeLeft + $lifetimeRight) < 3) {
             return;
         }
@@ -165,26 +207,29 @@ class CalculateBinaryIncome extends Command
         DB::transaction(function () use (
             $userId, $package, $newLeft, $newRight, $carryLeft, $carryRight,
             $totalLeft, $totalRight, $matched, $capped, $income, $rate,
-            $carryOutLeft, $carryOutRight, $flushedLeft, $flushedRight
+            $carryOutLeft, $carryOutRight, $flushedLeft, $flushedRight,
+            $primeCarryOutLeft, $primeCarryOutRight
         ) {
             BinaryPairLog::create([
-                'user_id'         => $userId,
-                'package_id'      => $package->id,
-                'package_type'    => $package->package_code,
-                'calc_date'       => now()->toDateString(),
-                'new_left'        => $newLeft,
-                'new_right'       => $newRight,
-                'carry_in_left'   => $carryLeft,
-                'carry_in_right'  => $carryRight,
-                'total_left'      => $totalLeft,
-                'total_right'     => $totalRight,
-                'matched_pairs'   => $matched,
-                'capped_pairs'    => $capped,
-                'income'          => $income,
-                'carry_out_left'  => $carryOutLeft,
-                'carry_out_right' => $carryOutRight,
-                'flushed_left'    => $flushedLeft,
-                'flushed_right'   => $flushedRight,
+                'user_id'               => $userId,
+                'package_id'            => $package->id,
+                'package_type'          => $package->package_code,
+                'calc_date'             => now()->toDateString(),
+                'new_left'              => $newLeft,
+                'new_right'             => $newRight,
+                'carry_in_left'         => $carryLeft,
+                'carry_in_right'        => $carryRight,
+                'total_left'            => $totalLeft,
+                'total_right'           => $totalRight,
+                'matched_pairs'         => $matched,
+                'capped_pairs'          => $capped,
+                'income'                => $income,
+                'carry_out_left'        => $carryOutLeft,
+                'carry_out_right'       => $carryOutRight,
+                'flushed_left'          => $flushedLeft,
+                'flushed_right'         => $flushedRight,
+                'prime_carry_out_left'  => $primeCarryOutLeft,
+                'prime_carry_out_right' => $primeCarryOutRight,
             ]);
 
             if ($income > 0) {
