@@ -394,6 +394,13 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                                     <th>Flushed Right</th>
                                     <td class="${log.flushed_right > 0 ? 'text-danger' : ''}">${log.flushed_right}</td>
                                 </tr>
+                                ${(log.prime_carry_out_left > 0 || log.prime_carry_out_right > 0) ? `
+                                <tr class="table-warning">
+                                    <th>Prime Carry Out Left</th>
+                                    <td class="text-warning font-weight-bold">${log.prime_carry_out_left} prime</td>
+                                    <th>Prime Carry Out Right</th>
+                                    <td class="text-warning font-weight-bold">${log.prime_carry_out_right} prime</td>
+                                </tr>` : ''}
                             </tbody>
                         </table>
                     </div>
@@ -450,8 +457,14 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
 
                 if (log.carry_in_left > 0 || log.carry_in_right > 0) {
                     html += `<div class="alert alert-warning py-1 mb-3"><i class="fas fa-info-circle"></i>
-                        Carry-in from previous run: <b>${log.carry_in_left}</b> Left, <b>${log.carry_in_right}</b> Right
+                        Premium carry-in from previous run: <b>${log.carry_in_left}</b> Left, <b>${log.carry_in_right}</b> Right
                         (from earlier cycles, not listed below)</div>`;
+                }
+
+                if (data.has_prime && (log.prime_carry_in_left > 0 || log.prime_carry_in_right > 0)) {
+                    html += `<div class="alert alert-info py-1 mb-3"><i class="fas fa-info-circle"></i>
+                        Prime carry-in from previous run: <b>${log.prime_carry_in_left}</b> Left, <b>${log.prime_carry_in_right}</b> Right
+                        (odd prime from last cycle counted here)</div>`;
                 }
 
                 function statusBadge(u) {
@@ -507,6 +520,57 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     html += `<div class="alert alert-success mt-2 mb-0">
                         <i class="fas fa-check-circle mr-1"></i>
                         <b>${log.capped} pair${log.capped>1?'s':''}</b> matched — income of <b>₹${log.income}</b>.</div>`;
+                }
+
+                // ── Prime contributions section ───────────────────────────────
+                if (data.has_prime && (data.left_prime.length > 0 || data.right_prime.length > 0 || log.prime_carry_in_left > 0 || log.prime_carry_in_right > 0)) {
+                    const totalPrimeL = data.left_prime.length  + log.prime_carry_in_left;
+                    const totalPrimeR = data.right_prime.length + log.prime_carry_in_right;
+                    const equivL = Math.floor(totalPrimeL / 2);
+                    const equivR = Math.floor(totalPrimeR / 2);
+
+                    html += `<div class="card mt-3 border-warning">
+                        <div class="card-header bg-warning py-1">
+                            <b><i class="fas fa-exchange-alt mr-1"></i>Prime → Premium Conversion</b>
+                            <span class="float-right text-dark" style="font-size:12px;">
+                                L: ${totalPrimeL} prime → <b>${equivL} premium equiv</b> &nbsp;|&nbsp;
+                                R: ${totalPrimeR} prime → <b>${equivR} premium equiv</b>
+                                ${(log.prime_carry_out_left > 0 || log.prime_carry_out_right > 0)
+                                    ? ` &nbsp;|&nbsp; <span class="text-dark">Carry out: L${log.prime_carry_out_left} R${log.prime_carry_out_right}</span>`
+                                    : ''}
+                            </span>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th><i class="fas fa-arrow-left mr-1 text-primary"></i>Left Prime Activations</th>
+                                        <th><i class="fas fa-arrow-right mr-1 text-danger"></i>Right Prime Activations</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+
+                    const maxRows = Math.max(data.left_prime.length, data.right_prime.length);
+                    if (maxRows === 0) {
+                        html += `<tr><td colspan="3" class="text-center text-muted">No new prime activations this run (carry-in only)</td></tr>`;
+                    }
+                    for (let i = 0; i < maxRows; i++) {
+                        const lp = data.left_prime[i];
+                        const rp = data.right_prime[i];
+                        const isPaired = i % 2 === 1; // every 2 primes = 1 pair
+                        const rowCls = (i < 2 * Math.min(equivL, equivR)) ? 'table-success' : '';
+                        const fmtUser = u => u
+                            ? `${u.connection||u.id} — ${u.name}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} · ${u.package_name||'Prime'}</small>`
+                            : '<span class="text-muted">—</span>';
+                        html += `<tr class="${rowCls}">
+                            <td>${i+1}</td>
+                            <td>${fmtUser(lp)}</td>
+                            <td>${fmtUser(rp)}</td>
+                        </tr>`;
+                    }
+
+                    html += `</tbody></table></div></div>`;
                 }
 
                 document.getElementById('pairsModalBody').innerHTML = html;

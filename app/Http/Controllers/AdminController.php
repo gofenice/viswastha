@@ -400,17 +400,49 @@ class AdminController extends Controller
             }
         }
 
+        // Prime packages that feed into this premium
+        $primePackageIds = DB::table('packages')
+            ->where('auto_upgrade_to_package_id', $log->package_id)
+            ->where('package_code', 'prime_package')
+            ->where('status', 1)
+            ->pluck('id')
+            ->toArray();
+
+        $leftPrimeUsers  = [];
+        $rightPrimeUsers = [];
+        $primeCarryInLeft  = 0;
+        $primeCarryInRight = 0;
+
+        if (!empty($primePackageIds)) {
+            $primeCarryInLeft  = $prevLog ? ($prevLog->prime_carry_out_left  ?? 0) : 0;
+            $primeCarryInRight = $prevLog ? ($prevLog->prime_carry_out_right ?? 0) : 0;
+
+            if ($leftChildId) {
+                $leftPrimeUsers  = $this->legActivationUsersByIds($leftChildId,  $primePackageIds, $since, $until);
+            }
+            if ($rightChildId) {
+                $rightPrimeUsers = $this->legActivationUsersByIds($rightChildId, $primePackageIds, $since, $until);
+            }
+        }
+
         return response()->json([
             'log'        => [
-                'date'        => \Carbon\Carbon::parse($log->calc_date)->format('d M Y'),
-                'package'     => $log->package->name ?? $log->package_type,
-                'capped'      => $capped,
-                'income'      => number_format($log->income, 2),
-                'carry_in_left'  => $log->carry_in_left,
-                'carry_in_right' => $log->carry_in_right,
+                'date'               => \Carbon\Carbon::parse($log->calc_date)->format('d M Y'),
+                'package'            => $log->package->name ?? $log->package_type,
+                'capped'             => $capped,
+                'income'             => number_format($log->income, 2),
+                'carry_in_left'      => $log->carry_in_left,
+                'carry_in_right'     => $log->carry_in_right,
+                'prime_carry_in_left'  => $primeCarryInLeft,
+                'prime_carry_in_right' => $primeCarryInRight,
+                'prime_carry_out_left'  => $log->prime_carry_out_left  ?? 0,
+                'prime_carry_out_right' => $log->prime_carry_out_right ?? 0,
             ],
-            'left'       => $leftUsers,
-            'right'      => $rightUsers,
+            'left'            => $leftUsers,
+            'right'           => $rightUsers,
+            'left_prime'      => $leftPrimeUsers,
+            'right_prime'     => $rightPrimeUsers,
+            'has_prime'       => !empty($primePackageIds),
         ]);
     }
 
@@ -433,6 +465,30 @@ class AdminController extends Controller
               AND up.created_at <= ?
             ORDER BY up.created_at
         ", [$childId, $packageId, $since, $until]);
+    }
+
+    private function legActivationUsersByIds(int $childId, array $packageIds, string $since, string $until): array
+    {
+        $placeholders = implode(',', array_fill(0, count($packageIds), '?'));
+        return DB::select("
+            WITH RECURSIVE subtree AS (
+                SELECT id FROM users WHERE id = ?
+                UNION ALL
+                SELECT u.id FROM users u
+                INNER JOIN subtree s ON u.parent_id = s.id
+            )
+            SELECT u.id, u.name, u.connection, up.created_at AS activated_at,
+                   p.name AS package_name
+            FROM user_packages up
+            JOIN users u ON u.id = up.user_id
+            JOIN packages p ON p.id = up.package_id
+            WHERE up.user_id IN (SELECT id FROM subtree)
+              AND up.package_id IN ({$placeholders})
+              AND up.status = 1
+              AND up.created_at > ?
+              AND up.created_at <= ?
+            ORDER BY up.created_at
+        ", array_merge([$childId], $packageIds, [$since, $until]));
     }
 
     public function directy_income_details()
