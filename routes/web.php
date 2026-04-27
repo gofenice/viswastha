@@ -91,6 +91,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/admin/user/assign-pan', [AdminController::class, 'assignPanCard'])->name('admin.user.assign_pan');
     Route::get('/directy_income_details', [AdminController::class, 'directy_income_details'])->name('directy_income_details');
     Route::get('/royalty_income_details', [AdminController::class, 'royalty_income_details'])->name('royalty_income_details');
+    Route::get('/sponsor_income_details', [AdminController::class, 'sponsorIncomeDetails'])->name('sponsor_income_details');
     Route::get('/package', [AdminController::class, 'package'])->name('package');
     Route::get('/view_sponsor', [AuthController::class, 'view_sponsor'])->name('view_sponsor');
     Route::get('/view_sponsor_superadmin', [AuthController::class, 'view_sponsor_superadmin'])->name('view_sponsor_superadmin');

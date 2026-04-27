@@ -373,6 +373,12 @@
                             </a>
                             <ul class="nav nav-treeview income">
                                 <li class="nav-item">
+                                    <a href="{{ route('sponsor_income_details') }}" class="nav-link sponsorincome">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Sponsor Income</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a href="{{ route('referral_income') }}" class="nav-link referal">
                                         <i class="far fa-circle nav-icon"></i>
                                         <p>Referral Incentive</p>

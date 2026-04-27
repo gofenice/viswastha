@@ -6933,4 +6933,30 @@ class AdminController extends Controller
             \Log::warning('[PrestaShop] Exception during customer registration for ' . $email . ': ' . $e->getMessage());
         }
     }
+
+    public function sponsorIncomeDetails(Request $request)
+    {
+        $user = auth()->user();
+
+        $query = \App\Models\BinaryTransaction::with(['user', 'fromUser', 'package'])
+            ->whereIn('type', ['binary_sponsor', 'prime_sponsor'])
+            ->orderBy('created_at', 'desc');
+
+        if ($user->role !== 'superadmin') {
+            $query->where('user_id', $user->id);
+        }
+
+        // Optional date filters
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        $transactions = $query->get();
+        $totalAmount  = $transactions->sum('amount');
+
+        return view('Admin.sponsor_income_details', compact('transactions', 'totalAmount'));
+    }
 }
