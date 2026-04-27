@@ -17,3 +17,7 @@ yarn-error.log
 *.zip
 assets/invoices/
 storage/logs/*.log
+.DS_Store
+storage/framework/sessions/
+storage/framework/views/
+storage/framework/cache/
