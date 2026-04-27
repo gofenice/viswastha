@@ -374,6 +374,36 @@ class AdminController extends Controller
         $leftUsers  = $leftChildId  ? $this->legActivationUsers($leftChildId,  $log->package_id, $since, $until) : [];
         $rightUsers = $rightChildId ? $this->legActivationUsers($rightChildId, $log->package_id, $since, $until) : [];
 
+        // Carry-in users were activated in the PREVIOUS window — fetch and prepend them
+        // so the popup shows who is behind the carry-in count (not a blank cell).
+        if ($log->carry_in_left > 0 || $log->carry_in_right > 0) {
+            $prevPrevLog = $prevLog
+                ? \App\Models\BinaryPairLog::where('user_id', $log->user_id)
+                    ->where('package_id', $log->package_id)
+                    ->where('id', '<', $prevLog->id)
+                    ->orderByDesc('id')
+                    ->first()
+                : null;
+
+            $prevSince = $prevPrevLog
+                ? $prevPrevLog->created_at->toDateTimeString()
+                : '2026-04-20 00:00:00';
+
+            if ($log->carry_in_left > 0 && $leftChildId) {
+                $prevLeft = $this->legActivationUsers($leftChildId, $log->package_id, $prevSince, $since);
+                // The carry-in users are the tail of the previous window (excess beyond matched count)
+                $ciLeft = array_slice($prevLeft, -(int) $log->carry_in_left);
+                foreach ($ciLeft as $u) { $u->carry_in = true; }
+                $leftUsers = array_merge($ciLeft, $leftUsers);
+            }
+            if ($log->carry_in_right > 0 && $rightChildId) {
+                $prevRight = $this->legActivationUsers($rightChildId, $log->package_id, $prevSince, $since);
+                $ciRight = array_slice($prevRight, -(int) $log->carry_in_right);
+                foreach ($ciRight as $u) { $u->carry_in = true; }
+                $rightUsers = array_merge($ciRight, $rightUsers);
+            }
+        }
+
         $capped       = (int) $log->capped_pairs;
         $isFirstRun   = !$prevLog;
         $leftPrimary  = $isFirstRun && ($log->total_left >= $log->total_right);
