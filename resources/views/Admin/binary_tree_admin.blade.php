@@ -81,10 +81,7 @@
 }
 .root-node .node-img { border-color: #fd7e14; }
 
-/* Package ring colors */
-.pkg-basic   .node-img { border: 5px solid #ffc107; box-shadow: 0 0 0 2px #ffc10755; }
-.pkg-prime   .node-img { border: 5px solid #fd7e14; box-shadow: 0 0 0 2px #fd7e1455; }
-.pkg-premium .node-img { border: 5px solid #28a745; box-shadow: 0 0 0 2px #28a74555; }
+/* Package ring colors applied via inline style from DB */
 
 .node-id   { font-size: 36px; color: #007bff; font-weight: 700; margin-bottom: 6px; }
 .node-name { font-size: 43px; color: #222; font-weight: 600; margin-bottom: 12px; word-break: break-word; line-height: 1.35; }
@@ -720,13 +717,14 @@ function renderBinaryTree() {
     allNodes.forEach(function (n) {
         const el = document.createElement('div');
         if (n.user) {
-            const hasMore = n.user.has_more ?? false;
-            const pkgClass = n.user.package_type ? ' pkg-' + n.user.package_type : '';
-            el.className = 'node-card' + (n.isRoot ? ' root-node' : '') + pkgClass;
+            const hasMore  = n.user.has_more ?? false;
+            const pkgColor = n.user.package_color || null;
+            el.className = 'node-card' + (n.isRoot ? ' root-node' : '');
             const imgSrc = n.user.user_image
                 ? '/' + n.user.user_image
                 : '/assets/dist/img/images.jpg';
-            const imgTag = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img" alt="user">';
+            const imgStyle = pkgColor ? ' style="border-color:' + pkgColor + '!important;box-shadow:0 0 0 2px ' + pkgColor + '55;"' : '';
+            const imgTag = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img"' + imgStyle + ' alt="user">';
             const imgHtml = hasMore
                 ? '<div class="node-img-wrap">' + imgTag + '<div class="has-more-badge" onclick="viewSubtree(event,' + n.user.id + ')" title="Has children — click to view"><i class="fas fa-chevron-down"></i></div></div>'
                 : imgTag;

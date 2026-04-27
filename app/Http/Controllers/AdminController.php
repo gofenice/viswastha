@@ -474,6 +474,7 @@ class AdminController extends Controller
             'package_code'                  => $validated['packageCategory'],
             'package_cat'                   => $validated['packageCat'],
             'status'                        => $validated['status'],
+            'color'                         => $request->input('color') ?: '#6c757d',
         ]);
         return redirect()->route('package')->with('success', 'Added Package Successfully.');
     }
@@ -499,6 +500,7 @@ class AdminController extends Controller
             'auto_upgrade_to_package_id'    => $request->input('auto_upgrade_to_package_id') ?: null,
             'daily_pair_cap'                => $validated['daily_pair_cap'],
             'status'                        => $validated['status'],
+            'color'                         => $request->input('color') ?: '#6c757d',
         ]);
         return redirect()->route('package')->with('successchange', 'Package updated successfully.');
     }
@@ -6822,12 +6824,16 @@ class AdminController extends Controller
         // Flag: this node has children that are hidden because depth limit reached
         $user->has_more = ($depth === 1) && ($left || $right);
 
-        // Resolve package type for profile ring color
-        $codes = \App\Models\UserPackage::where('user_packages.user_id', $user->id)
+        // Resolve active packages (ordered by amount desc so first = highest)
+        $activePackages = \App\Models\UserPackage::where('user_packages.user_id', $user->id)
             ->where('user_packages.status', 1)
             ->join('packages', 'packages.id', '=', 'user_packages.package_id')
-            ->pluck('packages.package_code')
-            ->toArray();
+            ->select('packages.package_code', 'packages.amount', 'packages.color')
+            ->orderBy('packages.amount', 'desc')
+            ->get();
+
+        $codes      = $activePackages->pluck('package_code')->toArray();
+        $topPackage = $activePackages->first();
 
         $hasBasic   = in_array('basic_package',   $codes);
         $hasPremium = in_array('premium_package', $codes);
@@ -6836,6 +6842,10 @@ class AdminController extends Controller
         $user->right_basic_vol   = $hasBasic   ? $this->legVolumeByPackageCode($user->id, 'right', 'basic_package')   : 0;
         $user->right_premium_vol = $hasPremium ? $this->legVolumeByPackageCode($user->id, 'right', 'premium_package') : 0;
 
+        // Color from highest-amount active package; null if no package
+        $user->package_color = $topPackage ? ($topPackage->color ?: '#6c757d') : null;
+
+        // Keep package_type for backward-compat (openPackageModal activation check)
         if (in_array('premium_package', $codes)) {
             $user->package_type = 'premium';
         } elseif (in_array('basic_package', $codes)) {

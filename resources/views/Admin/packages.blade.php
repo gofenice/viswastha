@@ -161,6 +161,13 @@
                             </div>
                         </div>
                     </div>
+                    <div class="form-group row">
+                        <label for="packageColor" class="col-sm-4 col-form-label">Tree Node Color</label>
+                        <div class="col-sm-8 d-flex align-items-center">
+                            <input type="color" class="mr-2" id="packageColor" name="color" value="#6c757d" style="width:50px;height:36px;padding:2px;border:1px solid #ced4da;border-radius:4px;cursor:pointer;">
+                            <small class="text-muted">Ring color shown around user photo in the binary tree</small>
+                        </div>
+                    </div>
                 </div>
                 <!-- /.card-body -->
                 <div class="card-footer">
@@ -184,6 +191,7 @@
                             <th>Category</th>
                             <th>Active/Inactive</th>
                             <th>Type</th>
+                            <th>Color</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -212,9 +220,12 @@
                                         @endif
                                     </td>
                                     <td>
+                                        <span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:{{ $package->color ?? '#6c757d' }};border:1px solid #aaa;" title="{{ $package->color ?? '#6c757d' }}"></span>
+                                    </td>
+                                    <td>
                                         <button class="btn btn-success btn-sm" data-toggle="modal"
                                             data-target="#editPackageModal"
-                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}', '{{ $package->binary_commission }}', '{{ $package->sponsor_commission }}', '{{ $package->daily_pair_cap }}', {{ json_encode($package->sponsor_eligible_package_ids ?? []) }}, '{{ $package->auto_upgrade_count }}', '{{ $package->auto_upgrade_to_package_id }}')">
+                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}', '{{ $package->binary_commission }}', '{{ $package->sponsor_commission }}', '{{ $package->daily_pair_cap }}', {{ json_encode($package->sponsor_eligible_package_ids ?? []) }}, '{{ $package->auto_upgrade_count }}', '{{ $package->auto_upgrade_to_package_id }}', '{{ $package->color ?? '#6c757d' }}')">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         {{-- <button class="btn btn-danger btn-sm" data-toggle="modal"
@@ -298,6 +309,13 @@
                                 <input type="radio" name="status" id="status_active" value="1"> Active
                                 <input type="radio" name="status" id="status_inactive" value="0"> Inactive
                             </div>
+                            <div class="form-group">
+                                <label for="editColor">Tree Node Color</label>
+                                <div class="d-flex align-items-center">
+                                    <input type="color" id="editColor" name="color" value="#6c757d" style="width:50px;height:36px;padding:2px;border:1px solid #ced4da;border-radius:4px;cursor:pointer;margin-right:10px;">
+                                    <small class="text-muted">Ring color in the binary tree node</small>
+                                </div>
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
@@ -349,7 +367,7 @@
         </script>
     @endif
     <script>
-        function editPackage(id, name, amount, status, binaryCommission, sponsorCommission, dailyPairCap, eligibleIds, autoUpgradeCount, autoUpgradeTo) {
+        function editPackage(id, name, amount, status, binaryCommission, sponsorCommission, dailyPairCap, eligibleIds, autoUpgradeCount, autoUpgradeTo, color) {
             $('#editPackageModal #packageId').val(id);
             $('#editPackageModal #editName').val(name);
             $('#editPackageModal #editAmount').val(amount);
@@ -358,6 +376,7 @@
             $('#editPackageModal #editDailyPairCap').val(dailyPairCap);
             $('#editPackageModal #editAutoUpgradeCount').val(autoUpgradeCount || '');
             $('#editPackageModal #editAutoUpgradeTo').val(autoUpgradeTo || '');
+            $('#editPackageModal #editColor').val(color || '#6c757d');
             const sel = document.getElementById('editSponsorEligible');
             Array.from(sel.options).forEach(opt => {
                 opt.selected = eligibleIds.includes(parseInt(opt.value));

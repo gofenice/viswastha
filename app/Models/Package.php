@@ -21,6 +21,7 @@ class Package extends Model
         'package_code',
         'package_cat',
         'status',
+        'color',
     ];
 
     protected $casts = [

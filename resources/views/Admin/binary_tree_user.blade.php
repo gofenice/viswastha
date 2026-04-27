@@ -30,9 +30,7 @@
 .btn-node-package { background: #eafaf1; color: #28a745; }
 .node-actions { display: flex; justify-content: center; gap: 10px; margin-top: 8px; }
 
-.pkg-basic   .node-img { border-color: #ffc107 !important; box-shadow: 0 0 0 3px #ffc10755; }
-.pkg-premium .node-img { border-color: #28a745 !important; box-shadow: 0 0 0 3px #28a74555; }
-.pkg-prime   .node-img { border-color: #fd7e14 !important; box-shadow: 0 0 0 3px #fd7e1455; }
+/* Package ring colors applied via inline style from DB */
 
 .vacant-node { position: absolute; width: 348px; background: #fff8f0; border: 2px dashed #fd7e14; border-radius: 14px; padding: 20px 10px; text-align: center; z-index: 2; }
 .vacant-circle { width: 108px; height: 108px; border-radius: 50%; background: #fff3e0; border: 2px dashed #fd7e14; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-size: 40px; color: #fd7e14; }
@@ -272,10 +270,11 @@ allNodes.forEach(function (n) {
     const el = document.createElement('div');
     if (n.user) {
         const hasMore  = n.user.has_more ?? false;
-        const pkgClass = n.user.package_type ? ' pkg-' + n.user.package_type : '';
-        el.className   = 'node-card' + (n.isRoot ? ' root-node' : '') + pkgClass;
+        const pkgColor = n.user.package_color || null;
+        el.className   = 'node-card' + (n.isRoot ? ' root-node' : '');
         const imgSrc   = n.user.user_image ? '/' + n.user.user_image : '/assets/dist/img/images.jpg';
-        const imgTag   = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img" alt="user">';
+        const imgStyle = pkgColor ? ' style="border-color:' + pkgColor + '!important;box-shadow:0 0 0 3px ' + pkgColor + '55;"' : '';
+        const imgTag   = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img"' + imgStyle + ' alt="user">';
         const imgHtml  = hasMore
             ? '<div class="node-img-wrap">' + imgTag + '<div class="has-more-badge" onclick="viewSubtree(event,' + n.user.id + ')"><i class="fas fa-chevron-down"></i></div></div>'
             : imgTag;
