@@ -458,7 +458,7 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                 if (log.carry_in_left > 0 || log.carry_in_right > 0) {
                     html += `<div class="alert alert-warning py-1 mb-3"><i class="fas fa-info-circle"></i>
                         Carry-in from previous run: <b>${log.carry_in_left}</b> Left, <b>${log.carry_in_right}</b> Right
-                        (shown with <span class="badge badge-warning">Prev Run</span> badge below)</div>`;
+                        (shown with <span class="badge badge-warning">Carry Forward</span> badge below)</div>`;
                 }
 
                 if (data.has_prime && (log.prime_carry_in_left > 0 || log.prime_carry_in_right > 0)) {
@@ -532,7 +532,7 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     }
                 }
 
-                const fmtUser = u => `${u.connection||u.id} — ${u.name}${u.carry_in ? ' <span class="badge badge-warning" style="font-size:0.7em;">Prev Run</span>' : ''}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>`;
+                const fmtUser = u => `${u.connection||u.id} — ${u.name}${u.carry_in ? ' <span class="badge badge-warning" style="font-size:0.7em;">Carry Forward</span>' : ''}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>`;
                 const fmtPrimeUsers = arr => arr.length
                     ? arr.map(u => `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;margin:1px 0;display:inline-block;">${u.connection||u.id}</span> ${u.name}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} · Prime</small>`).join('<hr style="margin:3px 0;">')
                     : '<span class="text-muted">—</span>';
