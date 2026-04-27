@@ -86,7 +86,6 @@ class CalculateBinaryIncome extends Command
         if ($package->package_code === 'premium_package') {
             $primePackageIds = DB::table('packages')
                 ->where('auto_upgrade_to_package_id', $package->id)
-                ->where('package_code', 'prime_package')
                 ->where('status', 1)
                 ->pluck('id')
                 ->toArray();

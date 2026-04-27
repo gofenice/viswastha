@@ -130,6 +130,7 @@
                             <select class="form-control" id="packageCategory" name="packageCategory" required>
                                 <option value="basic_package">Basic</option>
                                 <option value="premium_package">Premium</option>
+                                <option value="prime_package">Prime</option>
                             </select>
                             @error('packageCategory')
                                 <span class="text-danger">{{ $message }}</span>

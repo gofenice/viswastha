@@ -403,7 +403,6 @@ class AdminController extends Controller
         // Prime packages that feed into this premium
         $primePackageIds = DB::table('packages')
             ->where('auto_upgrade_to_package_id', $log->package_id)
-            ->where('package_code', 'prime_package')
             ->where('status', 1)
             ->pluck('id')
             ->toArray();
