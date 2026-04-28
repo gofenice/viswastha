@@ -1242,21 +1242,12 @@ function openPackageModal(e, userId, userName, hasPan, hasPackage) {
     const currentNodeId = new URLSearchParams(window.location.search).get('node_id');
     $('#pkgNodeId').val(currentNodeId || '');
 
-    // No PAN + no package → show PAN step first
-    if (!hasPan && !hasPackage) {
-        $('#panStepSection').show();
-        $('#pkgMainSection').hide();
-        $('#panStepInput').val('').focus();
-        $('#panStepMsg').text('').removeClass('text-success text-danger');
-        $('#packageModal .btn-success').prop('disabled', true);
-    } else {
-        $('#panStepSection').hide();
-        $('#pkgMainSection').show();
-        $('#pkgPackageSection').show();
-        loadUserPackageBadges(userId);
-        if (IS_ADMIN) loadPinOwners(userId);
-        $('#packageModal .btn-success').prop('disabled', false);
-    }
+    $('#panStepSection').hide();
+    $('#pkgMainSection').show();
+    $('#pkgPackageSection').show();
+    loadUserPackageBadges(userId);
+    if (IS_ADMIN) loadPinOwners(userId);
+    $('#packageModal .btn-success').prop('disabled', false);
 
     $('#packageModal').modal('show');
 }
