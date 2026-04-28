@@ -471,6 +471,8 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                 function fmtUserLine(u) {
                     const kindBadge = u._kind === 'prime'
                         ? `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:0.65em;">Prime</span>`
+                        : u._kind === 'basic'
+                        ? `<span class="badge" style="background:#e2f0fb;color:#0c4a7c;border:1px solid #3b8fd4;font-size:0.65em;">Basic</span>`
                         : `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:0.65em;">Premium</span>`;
                     const carryBadge = u.carry_in
                         ? ` <span class="badge badge-warning" style="font-size:0.65em;">Carry Forward</span>` : '';
@@ -487,8 +489,9 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                 }
 
                 // ── Build pools (mutable, consumed left-to-right) ─────────────
-                const lPremPool  = data.left.map(u => Object.assign({}, u, {_kind: 'premium'}));
-                const rPremPool  = data.right.map(u => Object.assign({}, u, {_kind: 'premium'}));
+                const pkgKind    = log.package_code === 'basic_package' ? 'basic' : 'premium';
+                const lPremPool  = data.left.map(u => Object.assign({}, u, {_kind: pkgKind}));
+                const rPremPool  = data.right.map(u => Object.assign({}, u, {_kind: pkgKind}));
                 const lPrimePool = data.has_prime ? data.left_prime.map(u => Object.assign({}, u, {_kind: 'prime'})) : [];
                 const rPrimePool = data.has_prime ? data.right_prime.map(u => Object.assign({}, u, {_kind: 'prime'})) : [];
 

@@ -458,6 +458,7 @@ class AdminController extends Controller
             'log'        => [
                 'date'                 => \Carbon\Carbon::parse($log->calc_date)->format('d M Y'),
                 'package'              => $log->package->name ?? $log->package_type,
+                'package_code'         => $log->package_type,
                 'capped'               => $capped,
                 'income'               => number_format($log->income, 2),
                 'carry_in_left'        => $log->carry_in_left,
