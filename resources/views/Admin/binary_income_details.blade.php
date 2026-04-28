@@ -530,32 +530,32 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                         const lc = leftIsPrimary ? take2Equiv(lPremPool, lPrimePool) : take1PremFirst(lPremPool, lPrimePool);
                         const rc = leftIsPrimary ? take1PremFirst(rPremPool, rPrimePool) : take2Equiv(rPremPool, rPrimePool);
                         allRows.push({lc, rc, status: 'matched'});
-                        // Rows 2…capped: 1:1, prime preferred
+                        // Rows 2…capped: 1:1, premium first then prime
                         for (let p = 1; p < capped; p++) {
                             allRows.push({
-                                lc: take1PrimeFirst(lPremPool, lPrimePool),
-                                rc: take1PrimeFirst(rPremPool, rPrimePool),
+                                lc: take1PremFirst(lPremPool, lPrimePool),
+                                rc: take1PremFirst(rPremPool, rPrimePool),
                                 status: 'matched'
                             });
                         }
                     } else {
-                        // Subsequent run: all rows 1:1, prime preferred
+                        // Subsequent run: all rows 1:1, premium first then prime
                         for (let p = 0; p < capped; p++) {
                             allRows.push({
-                                lc: take1PrimeFirst(lPremPool, lPrimePool),
-                                rc: take1PrimeFirst(rPremPool, rPrimePool),
+                                lc: take1PremFirst(lPremPool, lPrimePool),
+                                rc: take1PremFirst(rPremPool, rPrimePool),
                                 status: 'matched'
                             });
                         }
                     }
                 }
 
-                // Remaining users → carry or flushed rows
+                // Remaining users → carry or flushed rows, premium first
                 const lCarryStatus = log.carry_out_left  > 0 ? 'carry' : 'flushed';
                 const rCarryStatus = log.carry_out_right > 0 ? 'carry' : 'flushed';
                 while (lPremPool.length || lPrimePool.length || rPremPool.length || rPrimePool.length) {
-                    const lc = take1PrimeFirst(lPremPool, lPrimePool);
-                    const rc = take1PrimeFirst(rPremPool, rPrimePool);
+                    const lc = take1PremFirst(lPremPool, lPrimePool);
+                    const rc = take1PremFirst(rPremPool, rPrimePool);
                     if (!lc.length && !rc.length) break;
                     const status = lc.length ? lCarryStatus : rCarryStatus;
                     allRows.push({lc, rc, status});
