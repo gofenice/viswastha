@@ -467,83 +467,98 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                         (odd prime from last cycle counted here)</div>`;
                 }
 
-                function statusBadge(u) {
-                    if (!u) return '';
-                    if (u.status === 'matched')    return '<span class="badge badge-success">Matched</span>';
-                    if (u.status === 'carry')      return '<span class="badge badge-warning">Carry Fwd</span>';
+                // ── Helper: render one user line (premium or prime) ──────────
+                function fmtUserLine(u) {
+                    const kindBadge = u._kind === 'prime'
+                        ? `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:0.65em;">Prime</span>`
+                        : `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:0.65em;">Premium</span>`;
+                    const carryBadge = u.carry_in
+                        ? ` <span class="badge badge-warning" style="font-size:0.65em;">Carry Forward</span>` : '';
+                    return `${kindBadge} ${u.connection||u.id} — ${u.name}${carryBadge}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>`;
+                }
+                function fmtCell(users) {
+                    if (!users || !users.length) return '<span class="text-muted">—</span>';
+                    return users.map(fmtUserLine).join('<hr style="margin:3px 0;">');
+                }
+                function rowStatusBadge(status) {
+                    if (status === 'matched') return '<span class="badge badge-success">Matched</span>';
+                    if (status === 'carry')   return '<span class="badge badge-warning">Carry Fwd</span>';
                     return '<span class="badge badge-danger">Flushed</span>';
                 }
-                function buildRows(left, right) {
-                    const rows = [];
-                    let li = 0, ri = 0;
-                    while (li < left.length || ri < right.length) {
-                        const l = left[li], r = right[ri];
-                        if (l && l.status === 'first_sale') {
-                            // 2:1 rule extra activation — merge into the first matched row, not a separate row
-                            if (rows.length > 0) rows[rows.length - 1].extra_l = l;
-                            li++;
-                        } else if (r && r.status === 'first_sale') {
-                            if (rows.length > 0) rows[rows.length - 1].extra_r = r;
-                            ri++;
-                        } else if (l && r && l.status === 'matched' && r.status === 'matched') {
-                            rows.push({l, r}); li++; ri++;
-                        } else if (l) {
-                            rows.push({l, r: null}); li++;
-                        } else {
-                            rows.push({l: null, r}); ri++;
-                        }
-                    }
-                    return rows;
+
+                // ── Build pools (mutable, consumed left-to-right) ─────────────
+                const lPremPool  = data.left.map(u => Object.assign({}, u, {_kind: 'premium'}));
+                const rPremPool  = data.right.map(u => Object.assign({}, u, {_kind: 'premium'}));
+                const lPrimePool = data.has_prime ? data.left_prime.map(u => Object.assign({}, u, {_kind: 'prime'})) : [];
+                const rPrimePool = data.has_prime ? data.right_prime.map(u => Object.assign({}, u, {_kind: 'prime'})) : [];
+
+                // take 2 premium-equiv from a side (for first-run primary side: 2prem | 1prem+2prime | 4prime)
+                function take2Equiv(pPool, prPool) {
+                    if (pPool.length >= 2)                          return [pPool.shift(), pPool.shift()];
+                    if (pPool.length >= 1 && prPool.length >= 2)   return [pPool.shift(), prPool.shift(), prPool.shift()];
+                    if (prPool.length >= 4)                         return [prPool.shift(), prPool.shift(), prPool.shift(), prPool.shift()];
+                    // partial — cannot fully satisfy, grab whatever exists
+                    const r = [];
+                    if (pPool.length)  r.push(pPool.shift());
+                    while (prPool.length && r.length < 4) r.push(prPool.shift());
+                    return r;
+                }
+                // take 1 premium-equiv, premium preferred (for first-run secondary side + subsequent rows)
+                function take1PremFirst(pPool, prPool) {
+                    if (pPool.length >= 1)  return [pPool.shift()];
+                    if (prPool.length >= 2) return [prPool.shift(), prPool.shift()];
+                    if (prPool.length >= 1) return [prPool.shift()];
+                    return [];
+                }
+                // take 1 premium-equiv, 2×prime preferred over 1×premium (rows 2+)
+                function take1PrimeFirst(pPool, prPool) {
+                    if (prPool.length >= 2) return [prPool.shift(), prPool.shift()];
+                    if (pPool.length >= 1)  return [pPool.shift()];
+                    if (prPool.length >= 1) return [prPool.shift()];
+                    return [];
                 }
 
-                const fmtUser = u => `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:0.65em;">Premium</span> ${u.connection||u.id} — ${u.name}${u.carry_in ? ' <span class="badge badge-warning" style="font-size:0.7em;">Carry Forward</span>' : ''}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>`;
-                const fmtPrimeInCell = arr => arr.length
-                    ? `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #fd7e14;">${arr.map(u => `<small><span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:0.65em;">Prime</span> ${u.connection||u.id} — ${u.name}<br><span class="text-muted" style="font-size:0.75em;">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span></small>`).join('<br>')}</div>`
-                    : '';
+                // ── Build display rows ────────────────────────────────────────
+                const allRows = [];
+                const capped      = log.capped;
+                const isFirst     = log.is_first_run;
+                const leftIsPrimary = isFirst && (log.total_left >= log.total_right);
 
-                const premiumRows = buildRows(data.left, data.right);
-
-                // ── Distribute prime users inline into premium rows ────────────
-                // Premium users fill matched slots first. Prime equivs only fill matched
-                // slots that premium cannot cover; everything else goes to carry rows.
-                if (data.has_prime) {
-                    let lPool = [...data.left_prime];
-                    let rPool = [...data.right_prime];
-                    premiumRows.forEach(row => { row.lPrime = []; row.rPrime = []; });
-
-                    // Count matched slots on each side (including the 2:1 extra slot)
-                    const matchedLSlots = premiumRows.filter(r => r.l && r.l.status === 'matched').length
-                                        + premiumRows.filter(r => r.extra_l).length;
-                    const matchedRSlots = premiumRows.filter(r => r.r && r.r.status === 'matched').length
-                                        + premiumRows.filter(r => r.extra_r).length;
-
-                    // Prime only fills matched slots that premium cannot cover
-                    let primeNeedL = Math.max(0, matchedLSlots - data.left.length);
-                    let primeNeedR = Math.max(0, matchedRSlots - data.right.length);
-
-                    // Pass 1: assign prime to matched rows (only when premium is insufficient)
-                    premiumRows.forEach(row => {
-                        const ls = row.l ? row.l.status : null;
-                        const rs = row.r ? row.r.status : null;
-                        const lBlank = !row.l;
-                        const rBlank = !row.r;
-                        if (lPool.length >= 2 && primeNeedL > 0 && (ls === 'matched' || (lBlank && rs === 'matched'))) {
-                            row.lPrime = lPool.splice(0, 2); primeNeedL--;
+                if (capped > 0) {
+                    if (isFirst) {
+                        // Row 1: 2:1 unlock — primary side takes 2 equiv, secondary takes 1 equiv
+                        const lc = leftIsPrimary ? take2Equiv(lPremPool, lPrimePool) : take1PremFirst(lPremPool, lPrimePool);
+                        const rc = leftIsPrimary ? take1PremFirst(rPremPool, rPrimePool) : take2Equiv(rPremPool, rPrimePool);
+                        allRows.push({lc, rc, status: 'matched'});
+                        // Rows 2…capped: 1:1, prime preferred
+                        for (let p = 1; p < capped; p++) {
+                            allRows.push({
+                                lc: take1PrimeFirst(lPremPool, lPrimePool),
+                                rc: take1PrimeFirst(rPremPool, rPrimePool),
+                                status: 'matched'
+                            });
                         }
-                        if (rPool.length >= 2 && primeNeedR > 0 && (rs === 'matched' || (rBlank && ls === 'matched'))) {
-                            row.rPrime = rPool.splice(0, 2); primeNeedR--;
+                    } else {
+                        // Subsequent run: all rows 1:1, prime preferred
+                        for (let p = 0; p < capped; p++) {
+                            allRows.push({
+                                lc: take1PrimeFirst(lPremPool, lPrimePool),
+                                rc: take1PrimeFirst(rPremPool, rPrimePool),
+                                status: 'matched'
+                            });
                         }
-                    });
+                    }
+                }
 
-                    // Pass 2: remaining prime goes to carry rows
-                    premiumRows.forEach(row => {
-                        const ls = row.l ? row.l.status : null;
-                        const rs = row.r ? row.r.status : null;
-                        if (lPool.length > 0 && (ls === 'carry' || ls === 'flushed') && !row.lPrime.length)
-                            row.lPrime = lPool.splice(0, Math.min(2, lPool.length));
-                        if (rPool.length > 0 && (rs === 'carry' || rs === 'flushed') && !row.rPrime.length)
-                            row.rPrime = rPool.splice(0, Math.min(2, rPool.length));
-                    });
+                // Remaining users → carry or flushed rows
+                const lCarryStatus = log.carry_out_left  > 0 ? 'carry' : 'flushed';
+                const rCarryStatus = log.carry_out_right > 0 ? 'carry' : 'flushed';
+                while (lPremPool.length || lPrimePool.length || rPremPool.length || rPrimePool.length) {
+                    const lc = take1PrimeFirst(lPremPool, lPrimePool);
+                    const rc = take1PrimeFirst(rPremPool, rPrimePool);
+                    if (!lc.length && !rc.length) break;
+                    const status = lc.length ? lCarryStatus : rCarryStatus;
+                    allRows.push({lc, rc, status});
                 }
 
                 html += `<table class="table table-sm table-bordered">
@@ -557,24 +572,17 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     </thead>
                     <tbody>`;
 
-                if (premiumRows.length === 0) {
+                if (allRows.length === 0) {
                     html += `<tr><td colspan="4" class="text-center text-muted">No activations this run</td></tr>`;
                 }
 
-                const fmtExtraUser = u => `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #6f42c1;"><small><span class="badge" style="background:#6f42c1;color:#fff;font-size:0.65em;">2:1</span> ${u.connection||u.id} — ${u.name}<br><span class="text-muted" style="font-size:0.75em;">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span></small></div>`;
-
-                premiumRows.forEach(({l, r, lPrime, rPrime, extra_l, extra_r}, i) => {
-                    const status = l ? l.status : r ? r.status : 'carry';
-                    const cls = (status === 'matched') ? 'table-success' : '';
-                    const leftCell  = l ? fmtUser(l) + (extra_l ? fmtExtraUser(extra_l) : '') + fmtPrimeInCell(lPrime||[])
-                                       : (lPrime && lPrime.length ? fmtPrimeInCell(lPrime) : '<span class="text-muted">—</span>');
-                    const rightCell = r ? fmtUser(r) + (extra_r ? fmtExtraUser(extra_r) : '') + fmtPrimeInCell(rPrime||[])
-                                       : (rPrime && rPrime.length ? fmtPrimeInCell(rPrime) : '<span class="text-muted">—</span>');
+                allRows.forEach(({lc, rc, status}, i) => {
+                    const cls = status === 'matched' ? 'table-success' : '';
                     html += `<tr class="${cls}">
                         <td>${i+1}</td>
-                        <td>${leftCell}</td>
-                        <td>${rightCell}</td>
-                        <td>${statusBadge(l||r)}</td>
+                        <td>${fmtCell(lc)}</td>
+                        <td>${fmtCell(rc)}</td>
+                        <td>${rowStatusBadge(status)}</td>
                     </tr>`;
                 });
 
