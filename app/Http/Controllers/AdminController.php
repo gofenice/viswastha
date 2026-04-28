@@ -466,6 +466,8 @@ class AdminController extends Controller
                 'total_right'          => $log->total_right,
                 'prime_carry_in_left'  => $primeCarryInLeft,
                 'prime_carry_in_right' => $primeCarryInRight,
+                'carry_out_left'        => $log->carry_out_left,
+                'carry_out_right'       => $log->carry_out_right,
                 'prime_carry_out_left'  => $log->prime_carry_out_left  ?? 0,
                 'prime_carry_out_right' => $log->prime_carry_out_right ?? 0,
                 'is_first_run'         => !$prevLog,
