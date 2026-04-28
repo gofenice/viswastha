@@ -228,6 +228,44 @@
 .user-search-result:hover { background: #f8f9fa; }
 .user-search-result img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
 .search-results-list { max-height: 280px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; }
+
+/* ── Topbar quick search ── */
+.topbar-search-wrap {
+    position: relative;
+    margin-left: auto;
+}
+.topbar-search-wrap input {
+    width: 240px;
+    border-radius: 20px;
+    padding: 5px 14px 5px 36px;
+    border: 1px solid #ced4da;
+    font-size: 13px;
+    outline: none;
+}
+.topbar-search-wrap input:focus { border-color: #80bdff; box-shadow: 0 0 0 2px rgba(0,123,255,.2); }
+.topbar-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #aaa;
+    font-size: 13px;
+    pointer-events: none;
+}
+.topbar-search-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    width: 300px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    z-index: 9999;
+    max-height: 320px;
+    overflow-y: auto;
+    display: none;
+}
 </style>
 
 <div class="content-wrapper">
@@ -289,9 +327,18 @@
                 @endif
 
                 @if($currentNode)
-                    <span class="ml-auto text-muted small" style="font-size:12px;">
+                    <span class="text-muted small" style="font-size:12px;">
                         Viewing: <strong>{{ $currentNode->name }}</strong> ({{ $currentNode->connection }})
                     </span>
+                @endif
+
+                {{-- Quick search --}}
+                @if($settings->root_user_id)
+                <div class="topbar-search-wrap {{ $currentNode ? '' : 'ml-auto' }}">
+                    <i class="fas fa-search topbar-search-icon"></i>
+                    <input type="text" id="treeQuickSearch" placeholder="Search by ID or name…" autocomplete="off">
+                    <div id="treeQuickSearchDropdown" class="topbar-search-dropdown"></div>
+                </div>
                 @endif
             </div>
 
@@ -896,6 +943,42 @@ function liveSearch(inputId, resultsId, hiddenId, infoId, onSelect) {
 
 // ── Root search ───────────────────────────────────────────────────────────────
 liveSearch('rootSearch', 'rootSearchResults', 'selectedRootUserId', 'rootSelectedInfo');
+
+// ── Topbar quick search (tree users only) ─────────────────────────────────────
+(function () {
+    let debounce;
+    $('#treeQuickSearch').on('input', function () {
+        clearTimeout(debounce);
+        const q = $(this).val().trim();
+        const $drop = $('#treeQuickSearchDropdown');
+        if (q.length < 2) { $drop.hide().empty(); return; }
+        debounce = setTimeout(function () {
+            $.get(ROUTES.searchUsers, { q, tree_only: 1 }, function (data) {
+                $drop.empty();
+                if (!data.length) {
+                    $drop.html('<div class="p-2 text-muted small">No tree users found.</div>').show();
+                    return;
+                }
+                data.forEach(function (u) {
+                    $('<div class="user-search-result">')
+                        .html('<img src="' + u.image + '"><div><div style="font-size:13px;font-weight:600;">' + u.name + '</div><div style="font-size:11px;color:#888;">' + u.connection + '</div></div>')
+                        .on('click', function () {
+                            window.location.href = ROUTES.reload + '?node_id=' + u.id;
+                        })
+                        .appendTo($drop);
+                });
+                $drop.show();
+            });
+        }, 250);
+    });
+
+    // Close dropdown on outside click
+    $(document).on('click', function (e) {
+        if (!$(e.target).closest('.topbar-search-wrap').length) {
+            $('#treeQuickSearchDropdown').hide();
+        }
+    });
+})();
 
 $('#btnSetRoot').on('click', function () {
     const userId = $('#selectedRootUserId').val();

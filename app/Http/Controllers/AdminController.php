@@ -6847,23 +6847,32 @@ class AdminController extends Controller
 
     public function searchUsersForTransfer(Request $request)
     {
-        $query = $request->get('q', '');
-        $users = User::select('id', 'name', 'connection', 'user_image')
+        $query    = $request->get('q', '');
+        $treeOnly = $request->boolean('tree_only');
+
+        $builder = User::select('id', 'name', 'connection', 'user_image')
             ->where('role', 'user')
             ->where(function ($q) use ($query) {
                 $q->where('name', 'like', "%{$query}%")
                   ->orWhere('connection', 'like', "%{$query}%");
-            })
-            ->limit(20)
-            ->get()
-            ->map(function ($u) {
-                return [
-                    'id'         => $u->id,
-                    'name'       => $u->name,
-                    'connection' => $u->connection,
-                    'image'      => $u->user_image ? asset($u->user_image) : asset('assets/dist/img/images.jpg'),
-                ];
             });
+
+        if ($treeOnly) {
+            $rootId = DB::table('binary_settings')->value('root_user_id');
+            $builder->where(function ($q) use ($rootId) {
+                $q->whereNotNull('parent_id');
+                if ($rootId) $q->orWhere('id', $rootId);
+            });
+        }
+
+        $users = $builder->limit(20)->get()->map(function ($u) {
+            return [
+                'id'         => $u->id,
+                'name'       => $u->name,
+                'connection' => $u->connection,
+                'image'      => $u->user_image ? asset($u->user_image) : asset('assets/dist/img/images.jpg'),
+            ];
+        });
 
         return response()->json($users);
     }
