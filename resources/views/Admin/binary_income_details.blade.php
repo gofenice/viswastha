@@ -523,12 +523,15 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                         }
                     }
 
-                    // Remaining prime users that couldn't pair (carry-out or flushed)
+                    // Remaining prime users after prime-vs-prime matching.
+                    // These always contribute their equivalents to the premium pool — never truly flushed.
+                    // Only exception: a lone odd prime (tracked by prime_carry_out) which waits for a partner.
                     const leftRem  = data.left_prime.slice(lIdx);
                     const rightRem = data.right_prime.slice(rIdx);
                     if (leftRem.length || rightRem.length) {
-                        const isCarry = (log.prime_carry_out_left > 0 || log.prime_carry_out_right > 0);
-                        primePairRows.push({ leftUsers: leftRem, rightUsers: rightRem, matched: false, carry: isCarry });
+                        const isCarry    = (log.prime_carry_out_left > 0 || log.prime_carry_out_right > 0);
+                        const toPremium  = !isCarry; // all non-carry remainder went into premium pool
+                        primePairRows.push({ leftUsers: leftRem, rightUsers: rightRem, matched: false, carry: isCarry, toPremium });
                     }
                 }
 
@@ -570,14 +573,17 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                 });
 
                 // Prime pair rows (inline, same table)
-                primePairRows.forEach(({leftUsers, rightUsers, matched, carry}, i) => {
+                primePairRows.forEach(({leftUsers, rightUsers, matched, carry, toPremium}, i) => {
                     const rowNum = premiumRows.length + i + 1;
-                    const cls    = matched ? 'table-success' : (carry ? 'table-warning' : '');
+                    const cls    = matched ? 'table-success' : (carry ? 'table-warning' : (toPremium ? 'table-light' : ''));
+                    const primeBadge = `<span class="badge" style="background:#fd7e14;color:#fff;">Prime</span>`;
                     const badge  = matched
-                        ? `<span class="badge badge-success">Matched</span> <span class="badge" style="background:#fd7e14;color:#fff;">Prime</span>`
+                        ? `<span class="badge badge-success">Matched</span> ${primeBadge}`
                         : (carry
-                            ? `<span class="badge badge-warning">Carry Fwd</span> <span class="badge" style="background:#fd7e14;color:#fff;">Prime</span>`
-                            : `<span class="badge badge-danger">Flushed</span> <span class="badge" style="background:#fd7e14;color:#fff;">Prime</span>`);
+                            ? `<span class="badge badge-warning">Carry Fwd</span> ${primeBadge}`
+                            : (toPremium
+                                ? `<span class="badge badge-info">→ Premium</span> ${primeBadge}`
+                                : `<span class="badge badge-danger">Flushed</span> ${primeBadge}`));
                     html += `<tr class="${cls}">
                         <td>${rowNum}</td>
                         <td>${fmtPrimeUsers(leftUsers)}</td>
