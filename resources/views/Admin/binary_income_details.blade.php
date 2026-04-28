@@ -79,7 +79,7 @@
                             <tr>
                                 <th>User</th>
                                 <th class="text-center text-success">Pair Income</th>
-                                <th class="text-center text-info">Sponsor Income</th>
+                                <th class="text-center text-info">Referral Income</th>
                                 <th class="text-center text-primary">Total Wallet</th>
                                 <th class="text-center">Carry Fwd L</th>
                                 <th class="text-center">Carry Fwd R</th>

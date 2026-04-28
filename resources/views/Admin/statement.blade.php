@@ -114,7 +114,7 @@
                         <div class="inner">
                             <h3>₹ {{$totalrefferalincomepremium}}</h3>
 
-                            <p>Premium Sponsor Income</p>
+                            <p>Premium Referral Income</p>
                         </div>
                         <div class="icon">
                             <i class="ion ion-stats-bars"></i>
@@ -138,7 +138,7 @@
                         <div class="inner">
                             <h3>₹ {{ $totalrefferalincomebasic }}</h3>
 
-                            <p>Basic Sponsor Income</p>
+                            <p>Basic Referral Income</p>
                         </div>
                         <div class="icon">
                             <i class="ion ion-stats-bars"></i>

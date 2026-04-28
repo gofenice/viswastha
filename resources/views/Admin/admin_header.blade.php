@@ -375,7 +375,7 @@
                                 <li class="nav-item">
                                     <a href="{{ route('sponsor_income_details') }}" class="nav-link sponsorincome">
                                         <i class="far fa-circle nav-icon"></i>
-                                        <p>Sponsor Income</p>
+                                        <p>Referral Income</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">

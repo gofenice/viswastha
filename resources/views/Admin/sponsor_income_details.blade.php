@@ -1,17 +1,17 @@
 @extends('Admin.admin_header')
-@section('title', 'vishwastha | Sponsor Income')
+@section('title', 'vishwastha | Referral Income')
 @section('content')
     <div class="content-wrapper">
         <section class="content-header">
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1>Sponsor Income Details</h1>
+                        <h1>Referral Income Details</h1>
                     </div>
                     <div class="col-sm-6">
                         <ol class="breadcrumb float-sm-right">
                             <li class="breadcrumb-item"><a href="{{ route('adminhome') }}">Home</a></li>
-                            <li class="breadcrumb-item active">Sponsor Income</li>
+                            <li class="breadcrumb-item active">Referral Income</li>
                         </ol>
                     </div>
                 </div>
@@ -79,7 +79,7 @@
                             @empty
                                 <tr>
                                     <td colspan="{{ Auth::user()->role === 'superadmin' ? 7 : 6 }}" class="text-center text-muted">
-                                        No sponsor income records found.
+                                        No referral income records found.
                                     </td>
                                 </tr>
                             @endforelse
@@ -87,7 +87,7 @@
                         <tfoot>
                             <tr>
                                 <th colspan="{{ Auth::user()->role === 'superadmin' ? 7 : 6 }}" class="text-right">
-                                    Total Sponsor Income: ₹{{ number_format($totalAmount, 2) }}
+                                    Total Referral Income: ₹{{ number_format($totalAmount, 2) }}
                                 </th>
                             </tr>
                         </tfoot>

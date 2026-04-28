@@ -45,7 +45,7 @@
                     <div class="info-box bg-info">
                         <span class="info-box-icon"><i class="fas fa-user-plus"></i></span>
                         <div class="info-box-content">
-                            <span class="info-box-text">Sponsor Income</span>
+                            <span class="info-box-text">Referral Income</span>
                             <span class="info-box-number">₹{{ number_format($sponsorIncomeTotal, 2) }}</span>
                         </div>
                     </div>

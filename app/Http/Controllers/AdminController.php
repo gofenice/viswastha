@@ -1093,7 +1093,7 @@ class AdminController extends Controller
                 'name' => 'required|string|max:255|regex:/^[a-zA-Z\s]+$/',
                 'email' => 'required|string|email|max:255',
                 'phone_no' => 'required|string|max:10',
-                'pan_card_no' => 'required|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/',
+                'pan_card_no' => 'nullable|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/',
                 'address' => 'required|string',
                 'password' => [
                     'required',
@@ -1134,73 +1134,78 @@ class AdminController extends Controller
             $level     = 1;
         }
 
-        $panCardExists = DB::table('users')->where('pan_card_no', $request->pan_card_no)->exists();
+        // No PAN → Child ID (mother_id=0), cannot earn income
+        if (!$request->filled('pan_card_no')) {
+            $motherid = 0;
+        } else {
+            $panCardExists = DB::table('users')->where('pan_card_no', $request->pan_card_no)->exists();
 
-        if ($panCardExists) {
+            if ($panCardExists) {
 
-            $existingUser = DB::table('users')
-                ->where('pan_card_no', $request->pan_card_no)
-                ->first();
+                $existingUser = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->first();
 
-            if (strtolower($existingUser->name) !== strtolower($request->name)) {
-                return json_encode([
-                    'status' => 'error',
-                    'message' => 'The name does not match the existing record for this PAN card.',
-                    'correct_name' => $existingUser->name
-                ]);
-            }
-
-            // New accounts with same PAN must be placed within the Mother ID's binary subtree
-            $motherUser = DB::table('users')
-                ->where('pan_card_no', $request->pan_card_no)
-                ->where('mother_id', 1)
-                ->first();
-
-            if ($motherUser) {
-                $inSubtree = DB::select("
-                    WITH RECURSIVE subtree AS (
-                        SELECT id FROM users WHERE id = ?
-                        UNION ALL
-                        SELECT u.id FROM users u
-                        INNER JOIN subtree s ON u.parent_id = s.id
-                    )
-                    SELECT COUNT(*) as cnt FROM subtree WHERE id = ?
-                ", [$motherUser->id, $parent_id]);
-
-                if (($inSubtree[0]->cnt ?? 0) == 0) {
+                if (strtolower($existingUser->name) !== strtolower($request->name)) {
                     return json_encode([
                         'status' => 'error',
-                        'message' => 'This user must be placed within the Mother ID\'s binary tree.',
+                        'message' => 'The name does not match the existing record for this PAN card.',
+                        'correct_name' => $existingUser->name
                     ]);
                 }
-            }
 
-            $motherId1Exists = DB::table('users')
-                ->where('pan_card_no', $request->pan_card_no)
-                ->where('mother_id', 1)
-                ->exists();
+                // New accounts with same PAN must be placed within the Mother ID's binary subtree
+                $motherUser = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->where('mother_id', 1)
+                    ->first();
 
-            $motherId2Exists = DB::table('users')
-                ->where('pan_card_no', $request->pan_card_no)
-                ->where('mother_id', 2)
-                ->exists();
+                if ($motherUser) {
+                    $inSubtree = DB::select("
+                        WITH RECURSIVE subtree AS (
+                            SELECT id FROM users WHERE id = ?
+                            UNION ALL
+                            SELECT u.id FROM users u
+                            INNER JOIN subtree s ON u.parent_id = s.id
+                        )
+                        SELECT COUNT(*) as cnt FROM subtree WHERE id = ?
+                    ", [$motherUser->id, $parent_id]);
 
-            $motherId3Exists = DB::table('users')
-                ->where('pan_card_no', $request->pan_card_no)
-                ->where('mother_id', 3)
-                ->exists();
+                    if (($inSubtree[0]->cnt ?? 0) == 0) {
+                        return json_encode([
+                            'status' => 'error',
+                            'message' => 'This user must be placed within the Mother ID\'s binary tree.',
+                        ]);
+                    }
+                }
 
-            if ($motherId1Exists && $motherId2Exists && $motherId3Exists) {
-                $motherid = 0;
-            } elseif ($motherId1Exists && $motherId2Exists) {
-                $motherid = 3;
-            } elseif ($motherId1Exists) {
-                $motherid = 2;
+                $motherId1Exists = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->where('mother_id', 1)
+                    ->exists();
+
+                $motherId2Exists = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->where('mother_id', 2)
+                    ->exists();
+
+                $motherId3Exists = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->where('mother_id', 3)
+                    ->exists();
+
+                if ($motherId1Exists && $motherId2Exists && $motherId3Exists) {
+                    $motherid = 0;
+                } elseif ($motherId1Exists && $motherId2Exists) {
+                    $motherid = 3;
+                } elseif ($motherId1Exists) {
+                    $motherid = 2;
+                } else {
+                    $motherid = 1;
+                }
             } else {
                 $motherid = 1;
             }
-        } else {
-            $motherid = 1;
         }
 
         $user = User::create([
@@ -1255,7 +1260,7 @@ class AdminController extends Controller
                 'name' => 'required|string|max:255|regex:/^[a-zA-Z\s]+$/',
                 'email' => 'required|email',
                 'phone_no' => 'required|regex:/^[0-9]{10}$/',
-                'pan_card_no' => 'required|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/',
+                'pan_card_no' => 'nullable|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/',
                 'password' => [
                     'required',
                     'string',
@@ -1324,44 +1329,73 @@ class AdminController extends Controller
         $currenrsponsor = $sponsor->id;
         $level = 1;
 
-        $panCardExists = DB::table('users')->where('pan_card_no', $request->pan_card_no)->exists();
+        // No PAN → Child ID (mother_id=0), cannot earn income
+        if (!$request->filled('pan_card_no')) {
+            $motherid = 0;
+        } else {
+            $panCardExists = DB::table('users')->where('pan_card_no', $request->pan_card_no)->exists();
 
-        if ($panCardExists) {
+            if ($panCardExists) {
 
-            $existingUser = DB::table('users')
-                ->where('pan_card_no', $request->pan_card_no)
-                ->first();
+                $existingUser = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->first();
 
-            if (strtolower($existingUser->name) !== strtolower($request->name)) {
-                return redirect()->back()->with('error', "The name does not match the existing record for this PAN card.");
-            }
+                if (strtolower($existingUser->name) !== strtolower($request->name)) {
+                    return redirect()->back()->with('error', "The name does not match the existing record for this PAN card.");
+                }
 
-            $motherId1Exists = DB::table('users')
-                ->where('pan_card_no', $request->pan_card_no)
-                ->where('mother_id', 1)
-                ->exists();
+                // New accounts with same PAN must be placed within the Mother ID's binary subtree
+                $motherUser = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->where('mother_id', 1)
+                    ->first();
 
-            $motherId2Exists = DB::table('users')
-                ->where('pan_card_no', $request->pan_card_no)
-                ->where('mother_id', 2)
-                ->exists();
+                if ($motherUser) {
+                    // user_register always places at parent_id=996, so subtree check against 996
+                    $checkParent = 996;
+                    $inSubtree = DB::select("
+                        WITH RECURSIVE subtree AS (
+                            SELECT id FROM users WHERE id = ?
+                            UNION ALL
+                            SELECT u.id FROM users u
+                            INNER JOIN subtree s ON u.parent_id = s.id
+                        )
+                        SELECT COUNT(*) as cnt FROM subtree WHERE id = ?
+                    ", [$motherUser->id, $checkParent]);
 
-            $motherId3Exists = DB::table('users')
-                ->where('pan_card_no', $request->pan_card_no)
-                ->where('mother_id', 3)
-                ->exists();
+                    if (($inSubtree[0]->cnt ?? 0) == 0) {
+                        return redirect()->back()->with('error', 'This user must be placed within the Mother ID\'s binary tree.');
+                    }
+                }
 
-            if ($motherId1Exists && $motherId2Exists && $motherId3Exists) {
-                $motherid = 0;
-            } elseif ($motherId1Exists && $motherId2Exists) {
-                $motherid = 3;
-            } elseif ($motherId1Exists) {
-                $motherid = 2;
+                $motherId1Exists = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->where('mother_id', 1)
+                    ->exists();
+
+                $motherId2Exists = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->where('mother_id', 2)
+                    ->exists();
+
+                $motherId3Exists = DB::table('users')
+                    ->where('pan_card_no', $request->pan_card_no)
+                    ->where('mother_id', 3)
+                    ->exists();
+
+                if ($motherId1Exists && $motherId2Exists && $motherId3Exists) {
+                    $motherid = 0;
+                } elseif ($motherId1Exists && $motherId2Exists) {
+                    $motherid = 3;
+                } elseif ($motherId1Exists) {
+                    $motherid = 2;
+                } else {
+                    $motherid = 1;
+                }
             } else {
                 $motherid = 1;
             }
-        } else {
-            $motherid = 1;
         }
 
 
@@ -3201,7 +3235,7 @@ class AdminController extends Controller
             [
                 'id' => 'required|exists:users,id',
                 'name' => 'required|string|max:255|regex:/^[a-zA-Z\s]+$/',
-                'pan_card_no' => 'required|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/',
+                'pan_card_no' => 'nullable|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/',
                 'email' => 'required|email',
                 'phone_no' => 'required|regex:/^[0-9]{10}$/',
                 'pincode' => 'required|regex:/^[1-9][0-9]{5}$/',
@@ -6718,6 +6752,10 @@ class AdminController extends Controller
 
         $amount = (float) $package->sponsor_commission;
         if ($amount <= 0) return;
+
+        // Sponsor must have a valid PAN (mother_id != 0) to receive referral income
+        $sponsor = User::find($sponsorId);
+        if (!$sponsor || $sponsor->mother_id == 0) return;
 
         // Sponsor must hold an active package of the same type OR any cross-eligible package
         $eligibleIds = array_merge([$packageId], $package->sponsor_eligible_package_ids ?? []);
