@@ -504,21 +504,38 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                 const premiumRows = buildRows(data.left, data.right);
 
                 // ── Distribute prime users inline into premium rows ────────────
-                // Pass 1: assign 2 prime users to each matched/first_sale row (left then right)
-                // Pass 2: assign remaining prime to the first available carry row on each side
+                // Premium users fill matched slots first. Prime equivs only fill matched
+                // slots that premium cannot cover; everything else goes to carry rows.
                 if (data.has_prime) {
                     let lPool = [...data.left_prime];
                     let rPool = [...data.right_prime];
                     premiumRows.forEach(row => { row.lPrime = []; row.rPrime = []; });
 
+                    // Count matched slots on each side (including the 2:1 extra slot)
+                    const matchedLSlots = premiumRows.filter(r => r.l && r.l.status === 'matched').length
+                                        + premiumRows.filter(r => r.extra_l).length;
+                    const matchedRSlots = premiumRows.filter(r => r.r && r.r.status === 'matched').length
+                                        + premiumRows.filter(r => r.extra_r).length;
+
+                    // Prime only fills matched slots that premium cannot cover
+                    let primeNeedL = Math.max(0, matchedLSlots - data.left.length);
+                    let primeNeedR = Math.max(0, matchedRSlots - data.right.length);
+
+                    // Pass 1: assign prime to matched rows (only when premium is insufficient)
                     premiumRows.forEach(row => {
                         const ls = row.l ? row.l.status : null;
                         const rs = row.r ? row.r.status : null;
-                        if (lPool.length >= 2 && (ls === 'matched' || ls === 'first_sale'))
-                            row.lPrime = lPool.splice(0, 2);
-                        if (rPool.length >= 2 && (rs === 'matched' || rs === 'first_sale'))
-                            row.rPrime = rPool.splice(0, 2);
+                        const lBlank = !row.l;
+                        const rBlank = !row.r;
+                        if (lPool.length >= 2 && primeNeedL > 0 && (ls === 'matched' || (lBlank && rs === 'matched'))) {
+                            row.lPrime = lPool.splice(0, 2); primeNeedL--;
+                        }
+                        if (rPool.length >= 2 && primeNeedR > 0 && (rs === 'matched' || (rBlank && ls === 'matched'))) {
+                            row.rPrime = rPool.splice(0, 2); primeNeedR--;
+                        }
                     });
+
+                    // Pass 2: remaining prime goes to carry rows
                     premiumRows.forEach(row => {
                         const ls = row.l ? row.l.status : null;
                         const rs = row.r ? row.r.status : null;
