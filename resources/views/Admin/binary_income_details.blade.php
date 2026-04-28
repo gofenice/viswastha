@@ -496,7 +496,7 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     return rows;
                 }
 
-                const fmtUser = u => `${u.connection||u.id} — ${u.name}${u.carry_in ? ' <span class="badge badge-warning" style="font-size:0.7em;">Carry Forward</span>' : ''}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>`;
+                const fmtUser = u => `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:0.65em;">Premium</span> ${u.connection||u.id} — ${u.name}${u.carry_in ? ' <span class="badge badge-warning" style="font-size:0.7em;">Carry Forward</span>' : ''}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>`;
                 const fmtPrimeInCell = arr => arr.length
                     ? `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #fd7e14;">${arr.map(u => `<small><span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:0.65em;">Prime</span> ${u.connection||u.id} — ${u.name}<br><span class="text-muted" style="font-size:0.75em;">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span></small>`).join('<br>')}</div>`
                     : '';
