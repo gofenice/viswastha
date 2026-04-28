@@ -488,60 +488,38 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     return rows;
                 }
 
-                // ── Build prime pair rows (grouped per matched pair) ─────────
-                const primePairRows = [];
-                if (data.has_prime) {
-                    const totalPrimeL = data.left_prime.length  + (log.prime_carry_in_left  || 0);
-                    const totalPrimeR = data.right_prime.length + (log.prime_carry_in_right || 0);
-                    const equivL = Math.floor(totalPrimeL / 2);
-                    const equivR = Math.floor(totalPrimeR / 2);
-                    const primePairs = Math.min(equivL, equivR);
-                    let lIdx = 0, rIdx = 0;
-
-                    if (log.is_first_run && primePairs >= 1) {
-                        // First-sale 2:1 rule: primary side contributes 2 equivs (4 prime),
-                        // secondary contributes 1 equiv (2 prime) → all consumed in 1 row.
-                        const leftIsPrimary = equivL >= equivR;
-                        const leftPrimeForPair  = (leftIsPrimary  ? 2 : 1) * 2;
-                        const rightPrimeForPair = (leftIsPrimary  ? 1 : 2) * 2;
-                        const leftUsers  = data.left_prime.slice(lIdx,  lIdx  + leftPrimeForPair);  lIdx  += leftPrimeForPair;
-                        const rightUsers = data.right_prime.slice(rIdx, rIdx + rightPrimeForPair); rIdx += rightPrimeForPair;
-                        primePairRows.push({ leftUsers, rightUsers, matched: true });
-
-                        // Any additional pairs after the first-sale pair: 2 prime per side
-                        for (let p = 1; p < primePairs; p++) {
-                            const lu = data.left_prime.slice(lIdx,  lIdx  + 2); lIdx  += 2;
-                            const ru = data.right_prime.slice(rIdx, rIdx + 2); rIdx += 2;
-                            primePairRows.push({ leftUsers: lu, rightUsers: ru, matched: true });
-                        }
-                    } else {
-                        // Subsequent runs: 2 prime per side per matched pair
-                        for (let p = 0; p < primePairs; p++) {
-                            const lu = data.left_prime.slice(lIdx,  lIdx  + 2); lIdx  += 2;
-                            const ru = data.right_prime.slice(rIdx, rIdx + 2); rIdx += 2;
-                            primePairRows.push({ leftUsers: lu, rightUsers: ru, matched: true });
-                        }
-                    }
-
-                    // Remaining prime users after prime-vs-prime matching.
-                    // These always contribute their equivalents to the premium pool — never truly flushed.
-                    // Only exception: a lone odd prime (tracked by prime_carry_out) which waits for a partner.
-                    const leftRem  = data.left_prime.slice(lIdx);
-                    const rightRem = data.right_prime.slice(rIdx);
-                    if (leftRem.length || rightRem.length) {
-                        const isCarry    = (log.prime_carry_out_left > 0 || log.prime_carry_out_right > 0);
-                        const toPremium  = !isCarry; // all non-carry remainder went into premium pool
-                        primePairRows.push({ leftUsers: leftRem, rightUsers: rightRem, matched: false, carry: isCarry, toPremium });
-                    }
-                }
-
                 const fmtUser = u => `${u.connection||u.id} — ${u.name}${u.carry_in ? ' <span class="badge badge-warning" style="font-size:0.7em;">Carry Forward</span>' : ''}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</small>`;
-                const fmtPrimeUsers = arr => arr.length
-                    ? arr.map(u => `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;margin:1px 0;display:inline-block;">${u.connection||u.id}</span> ${u.name}<br><small class="text-muted">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} · Prime</small>`).join('<hr style="margin:3px 0;">')
-                    : '<span class="text-muted">—</span>';
+                const fmtPrimeInCell = arr => arr.length
+                    ? `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #fd7e14;">${arr.map(u => `<small><span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:0.65em;">Prime</span> ${u.connection||u.id} — ${u.name}<br><span class="text-muted" style="font-size:0.75em;">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span></small>`).join('<br>')}</div>`
+                    : '';
 
                 const premiumRows = buildRows(data.left, data.right);
-                const totalRows   = premiumRows.length + primePairRows.length;
+
+                // ── Distribute prime users inline into premium rows ────────────
+                // Pass 1: assign 2 prime users to each matched/first_sale row (left then right)
+                // Pass 2: assign remaining prime to the first available carry row on each side
+                if (data.has_prime) {
+                    let lPool = [...data.left_prime];
+                    let rPool = [...data.right_prime];
+                    premiumRows.forEach(row => { row.lPrime = []; row.rPrime = []; });
+
+                    premiumRows.forEach(row => {
+                        const ls = row.l ? row.l.status : null;
+                        const rs = row.r ? row.r.status : null;
+                        if (lPool.length >= 2 && (ls === 'matched' || ls === 'first_sale'))
+                            row.lPrime = lPool.splice(0, 2);
+                        if (rPool.length >= 2 && (rs === 'matched' || rs === 'first_sale'))
+                            row.rPrime = rPool.splice(0, 2);
+                    });
+                    premiumRows.forEach(row => {
+                        const ls = row.l ? row.l.status : null;
+                        const rs = row.r ? row.r.status : null;
+                        if (lPool.length > 0 && (ls === 'carry' || ls === 'flushed') && !row.lPrime.length)
+                            row.lPrime = lPool.splice(0, Math.min(2, lPool.length));
+                        if (rPool.length > 0 && (rs === 'carry' || rs === 'flushed') && !row.rPrime.length)
+                            row.rPrime = rPool.splice(0, Math.min(2, rPool.length));
+                    });
+                }
 
                 html += `<table class="table table-sm table-bordered">
                     <thead class="thead-dark">
@@ -554,41 +532,22 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     </thead>
                     <tbody>`;
 
-                if (totalRows === 0) {
+                if (premiumRows.length === 0) {
                     html += `<tr><td colspan="4" class="text-center text-muted">No activations this run</td></tr>`;
                 }
 
-                // Premium pair rows
-                premiumRows.forEach(({l, r}, i) => {
-                    const status = l ? l.status : r.status;
+                premiumRows.forEach(({l, r, lPrime, rPrime}, i) => {
+                    const status = l ? l.status : r ? r.status : 'carry';
                     const cls = (status === 'matched') ? 'table-success' : (status === 'first_sale') ? 'table-info' : '';
-                    const leftCell  = l ? fmtUser(l) : '<span class="text-muted">—</span>';
-                    const rightCell = r ? fmtUser(r) : '<span class="text-muted">—</span>';
+                    const leftCell  = l ? fmtUser(l) + fmtPrimeInCell(lPrime||[])
+                                       : (lPrime && lPrime.length ? fmtPrimeInCell(lPrime) : '<span class="text-muted">—</span>');
+                    const rightCell = r ? fmtUser(r) + fmtPrimeInCell(rPrime||[])
+                                       : (rPrime && rPrime.length ? fmtPrimeInCell(rPrime) : '<span class="text-muted">—</span>');
                     html += `<tr class="${cls}">
                         <td>${i+1}</td>
                         <td>${leftCell}</td>
                         <td>${rightCell}</td>
                         <td>${statusBadge(l||r)}</td>
-                    </tr>`;
-                });
-
-                // Prime pair rows (inline, same table)
-                primePairRows.forEach(({leftUsers, rightUsers, matched, carry, toPremium}, i) => {
-                    const rowNum = premiumRows.length + i + 1;
-                    const cls    = matched ? 'table-success' : (carry ? 'table-warning' : (toPremium ? 'table-light' : ''));
-                    const primeBadge = `<span class="badge" style="background:#fd7e14;color:#fff;">Prime</span>`;
-                    const badge  = matched
-                        ? `<span class="badge badge-success">Matched</span> ${primeBadge}`
-                        : (carry
-                            ? `<span class="badge badge-warning">Carry Fwd</span> ${primeBadge}`
-                            : (toPremium
-                                ? `<span class="badge badge-info">→ Premium</span> ${primeBadge}`
-                                : `<span class="badge badge-danger">Flushed</span> ${primeBadge}`));
-                    html += `<tr class="${cls}">
-                        <td>${rowNum}</td>
-                        <td>${fmtPrimeUsers(leftUsers)}</td>
-                        <td>${fmtPrimeUsers(rightUsers)}</td>
-                        <td>${badge}</td>
                     </tr>`;
                 });
 
