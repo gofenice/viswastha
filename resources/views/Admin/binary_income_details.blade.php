@@ -470,7 +470,6 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                 function statusBadge(u) {
                     if (!u) return '';
                     if (u.status === 'matched')    return '<span class="badge badge-success">Matched</span>';
-                    if (u.status === 'first_sale') return '<span class="badge" style="background:#6f42c1;color:#fff;">First Sale</span>';
                     if (u.status === 'carry')      return '<span class="badge badge-warning">Carry Fwd</span>';
                     return '<span class="badge badge-danger">Flushed</span>';
                 }
@@ -479,11 +478,20 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     let li = 0, ri = 0;
                     while (li < left.length || ri < right.length) {
                         const l = left[li], r = right[ri];
-                        if (l && l.status === 'first_sale') { rows.push({l, r: null}); li++; }
-                        else if (r && r.status === 'first_sale') { rows.push({l: null, r}); ri++; }
-                        else if (l && r && l.status === 'matched' && r.status === 'matched') { rows.push({l, r}); li++; ri++; }
-                        else if (l) { rows.push({l, r: null}); li++; }
-                        else { rows.push({l: null, r}); ri++; }
+                        if (l && l.status === 'first_sale') {
+                            // 2:1 rule extra activation — merge into the first matched row, not a separate row
+                            if (rows.length > 0) rows[rows.length - 1].extra_l = l;
+                            li++;
+                        } else if (r && r.status === 'first_sale') {
+                            if (rows.length > 0) rows[rows.length - 1].extra_r = r;
+                            ri++;
+                        } else if (l && r && l.status === 'matched' && r.status === 'matched') {
+                            rows.push({l, r}); li++; ri++;
+                        } else if (l) {
+                            rows.push({l, r: null}); li++;
+                        } else {
+                            rows.push({l: null, r}); ri++;
+                        }
                     }
                     return rows;
                 }
@@ -536,12 +544,14 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     html += `<tr><td colspan="4" class="text-center text-muted">No activations this run</td></tr>`;
                 }
 
-                premiumRows.forEach(({l, r, lPrime, rPrime}, i) => {
+                const fmtExtraUser = u => `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #6f42c1;"><small><span class="badge" style="background:#6f42c1;color:#fff;font-size:0.65em;">2:1</span> ${u.connection||u.id} — ${u.name}<br><span class="text-muted" style="font-size:0.75em;">${new Date(u.activated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span></small></div>`;
+
+                premiumRows.forEach(({l, r, lPrime, rPrime, extra_l, extra_r}, i) => {
                     const status = l ? l.status : r ? r.status : 'carry';
-                    const cls = (status === 'matched') ? 'table-success' : (status === 'first_sale') ? 'table-info' : '';
-                    const leftCell  = l ? fmtUser(l) + fmtPrimeInCell(lPrime||[])
+                    const cls = (status === 'matched') ? 'table-success' : '';
+                    const leftCell  = l ? fmtUser(l) + (extra_l ? fmtExtraUser(extra_l) : '') + fmtPrimeInCell(lPrime||[])
                                        : (lPrime && lPrime.length ? fmtPrimeInCell(lPrime) : '<span class="text-muted">—</span>');
-                    const rightCell = r ? fmtUser(r) + fmtPrimeInCell(rPrime||[])
+                    const rightCell = r ? fmtUser(r) + (extra_r ? fmtExtraUser(extra_r) : '') + fmtPrimeInCell(rPrime||[])
                                        : (rPrime && rPrime.length ? fmtPrimeInCell(rPrime) : '<span class="text-muted">—</span>');
                     html += `<tr class="${cls}">
                         <td>${i+1}</td>
