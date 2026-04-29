@@ -91,9 +91,6 @@ class CalculateBinaryIncome extends Command
                 ->toArray();
 
             if (!empty($primePackageIds)) {
-                $primeCarryLeft  = $lastLog ? ($lastLog->prime_carry_out_left  ?? 0) : 0;
-                $primeCarryRight = $lastLog ? ($lastLog->prime_carry_out_right ?? 0) : 0;
-
                 $newPrimeLeft  = 0;
                 $newPrimeRight = 0;
                 foreach ($primePackageIds as $primeId) {
@@ -101,14 +98,11 @@ class CalculateBinaryIncome extends Command
                     $newPrimeRight += $this->legActivationsSince($userId, 'right', $since, $primeId);
                 }
 
-                $totalPrimeLeft  = $newPrimeLeft  + $primeCarryLeft;
-                $totalPrimeRight = $newPrimeRight + $primeCarryRight;
-
-                // 2 prime = 1 premium equivalent; leftover carries to next run
-                $newLeft  += intdiv($totalPrimeLeft,  2);
-                $newRight += intdiv($totalPrimeRight, 2);
-                $primeCarryOutLeft  = $totalPrimeLeft  % 2;
-                $primeCarryOutRight = $totalPrimeRight % 2;
+                // 2 prime = 1 premium equivalent; odd leftover is flushed (not carried)
+                $newLeft  += intdiv($newPrimeLeft,  2);
+                $newRight += intdiv($newPrimeRight, 2);
+                $primeCarryOutLeft  = 0;
+                $primeCarryOutRight = 0;
             }
         }
 

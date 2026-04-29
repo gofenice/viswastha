@@ -439,13 +439,8 @@ class AdminController extends Controller
 
         $leftPrimeUsers  = [];
         $rightPrimeUsers = [];
-        $primeCarryInLeft  = 0;
-        $primeCarryInRight = 0;
 
         if (!empty($primePackageIds)) {
-            $primeCarryInLeft  = $prevLog ? ($prevLog->prime_carry_out_left  ?? 0) : 0;
-            $primeCarryInRight = $prevLog ? ($prevLog->prime_carry_out_right ?? 0) : 0;
-
             if ($leftChildId) {
                 $leftPrimeUsers  = $this->legActivationUsersByIds($leftChildId,  $primePackageIds, $since, $until);
             }
@@ -465,8 +460,6 @@ class AdminController extends Controller
                 'carry_in_right'       => $log->carry_in_right,
                 'total_left'           => $log->total_left,
                 'total_right'          => $log->total_right,
-                'prime_carry_in_left'  => $primeCarryInLeft,
-                'prime_carry_in_right' => $primeCarryInRight,
                 'carry_out_left'        => $log->carry_out_left,
                 'carry_out_right'       => $log->carry_out_right,
                 'prime_carry_out_left'  => $log->prime_carry_out_left  ?? 0,

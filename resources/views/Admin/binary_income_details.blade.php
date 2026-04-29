@@ -461,11 +461,6 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                         (shown with <span class="badge badge-warning">Carry Forward</span> badge below)</div>`;
                 }
 
-                if (data.has_prime && (log.prime_carry_in_left > 0 || log.prime_carry_in_right > 0)) {
-                    html += `<div class="alert alert-info py-1 mb-3"><i class="fas fa-info-circle"></i>
-                        Prime carry-in from previous run: <b>${log.prime_carry_in_left}</b> Left, <b>${log.prime_carry_in_right}</b> Right
-                        (odd prime from last cycle counted here)</div>`;
-                }
 
                 // ── Helper: render one user line (premium or prime) ──────────
                 function fmtUserLine(u) {
