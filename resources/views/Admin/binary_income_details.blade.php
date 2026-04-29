@@ -361,8 +361,8 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 const rightPrime    = data.right_prime   ?? 0;
                 const flushedPrimeL = hasPrime ? leftPrime  % 2 : 0;
                 const flushedPrimeR = hasPrime ? rightPrime % 2 : 0;
-                const pBadge  = `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:0.72em;vertical-align:middle;">Premium</span>`;
-                const prBadge = `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:0.72em;vertical-align:middle;">Prime</span>`;
+                const pBadge  = `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:10px;vertical-align:middle;">Premium</span>`;
+                const prBadge = `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:10px;vertical-align:middle;">Prime</span>`;
                 function sectionCard(title, color, rows) {
                     return `<div class="card card-outline card-${color} mb-2">
                         <div class="card-header p-2 font-weight-bold" style="font-size:13px;">${title}</div>
@@ -370,13 +370,13 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                     </div>`;
                 }
                 function splitRow(pVal, prVal, pClass='', prClass='') {
-                    return `<div class="d-flex justify-content-between mb-1">
-                        <span>${pBadge} <span class="${pClass} font-weight-bold">${pVal}</span></span>
-                        ${hasPrime ? `<span>${prBadge} <span class="${prClass} font-weight-bold">${prVal}</span></span>` : ''}
+                    return `<div class="d-flex justify-content-between mb-1" style="font-size:13px;">
+                        <span>${pBadge} <span class="${pClass} font-weight-bold" style="font-size:13px;">${pVal}</span></span>
+                        ${hasPrime ? `<span>${prBadge} <span class="${prClass} font-weight-bold" style="font-size:13px;">${prVal}</span></span>` : ''}
                     </div>`;
                 }
                 document.getElementById('incomeDetailBody').innerHTML = `
-                <h6 class="text-primary border-bottom pb-1 mb-3">Pair Calculation — ${date}</h6>
+                <h6 class="text-primary border-bottom pb-1 mb-3" style="font-size:14px;">Pair Calculation — ${date}</h6>
 
                 {{-- New Left / New Right --}}
                 <div class="row mb-1">
@@ -397,12 +397,12 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 <div class="row mb-1">
                     <div class="col-6 pr-1">
                         ${sectionCard('Carry In Left', 'info',
-                            `<span class="font-weight-bold">${log.carry_in_left}</span> premium-equiv`
+                            `<span class="font-weight-bold" style="font-size:13px;">${log.carry_in_left}</span> <span style="font-size:13px;">premium-equiv</span>`
                         )}
                     </div>
                     <div class="col-6 pl-1">
                         ${sectionCard('Carry In Right', 'info',
-                            `<span class="font-weight-bold">${log.carry_in_right}</span> premium-equiv`
+                            `<span class="font-weight-bold" style="font-size:13px;">${log.carry_in_right}</span> <span style="font-size:13px;">premium-equiv</span>`
                         )}
                     </div>
                 </div>` : ''}
@@ -448,7 +448,7 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 {{-- Flushed --}}
                 <div class="card card-outline card-danger mb-2">
                     <div class="card-header p-2 font-weight-bold" style="font-size:13px;">Flushed</div>
-                    <div class="card-body p-2">
+                    <div class="card-body p-2" style="font-size:13px;">
                         <div class="row">
                             <div class="col-6 border-right">
                                 <div style="font-size:11px;color:#888;margin-bottom:4px;">Left</div>
@@ -468,12 +468,12 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
 
                 {{-- How it worked --}}
                 <div class="callout callout-info mb-0" style="font-size:12px;">
-                    <b>How it worked:</b><br>
+                    <b style="font-size:12px;">How it worked:</b><br>
                     ${hasPrime
-                        ? `New L: ${leftPremium} premium + ${leftPrime} prime (÷2=${Math.floor(leftPrime/2)}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> equiv<br>
-                           New R: ${rightPremium} premium + ${rightPrime} prime (÷2=${Math.floor(rightPrime/2)}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> equiv<br>`
-                        : `New L(${log.new_left}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> left<br>
-                           New R(${log.new_right}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> right<br>`}
+                        ? `<span style="font-size:12px;">New L: ${leftPremium} premium + ${leftPrime} prime (÷2=${Math.floor(leftPrime/2)}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> equiv</span><br>
+                           <span style="font-size:12px;">New R: ${rightPremium} premium + ${rightPrime} prime (÷2=${Math.floor(rightPrime/2)}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> equiv</span><br>`
+                        : `<span style="font-size:12px;">New L(${log.new_left}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> left</span><br>
+                           <span style="font-size:12px;">New R(${log.new_right}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> right</span><br>`}
                     ${(() => {
                         const L = log.total_left, R = log.total_right;
                         if (log.is_first_run) {
@@ -481,16 +481,16 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                             const primary = leftPrimary ? 'Left' : 'Right';
                             const secondary = leftPrimary ? 'Right' : 'Left';
                             const extraPairs = log.matched_pairs - 1;
-                            return `<span class="text-warning">First run 2:1 — 2 from ${primary} + 1 from ${secondary} = 1st pair</span><br>` +
-                                   (extraPairs > 0 ? `Then 1:1 → <b>${extraPairs}</b> more pair(s)<br>` : '');
+                            return `<span class="text-warning" style="font-size:12px;">First run 2:1 — 2 from ${primary} + 1 from ${secondary} = 1st pair</span><br>` +
+                                   (extraPairs > 0 ? `<span style="font-size:12px;">Then 1:1 → <b>${extraPairs}</b> more pair(s)</span><br>` : '');
                         }
-                        return `Min(${L}, ${R}) = <b>${log.matched_pairs}</b> matched<br>`;
+                        return `<span style="font-size:12px;">Min(${L}, ${R}) = <b>${log.matched_pairs}</b> matched</span><br>`;
                     })()}
-                    Capped at <b>${log.capped_pairs}</b> → ₹<b>${parseFloat(log.income).toLocaleString('en-IN')}</b><br>
-                    ${log.carry_out_left  > 0 ? `Left carries <b>${log.carry_out_left}</b> forward<br>`  : ''}
-                    ${log.carry_out_right > 0 ? `Right carries <b>${log.carry_out_right}</b> forward<br>` : ''}
+                    <span style="font-size:12px;">Capped at <b>${log.capped_pairs}</b> → ₹<b>${parseFloat(log.income).toLocaleString('en-IN')}</b></span><br>
+                    ${log.carry_out_left  > 0 ? `<span style="font-size:12px;">Left carries <b>${log.carry_out_left}</b> forward</span><br>`  : ''}
+                    ${log.carry_out_right > 0 ? `<span style="font-size:12px;">Right carries <b>${log.carry_out_right}</b> forward</span><br>` : ''}
                     ${(log.flushed_left > 0 || flushedPrimeL > 0 || log.flushed_right > 0 || flushedPrimeR > 0)
-                        ? `<span class="text-danger">Flushed — L: ${log.flushed_left} premium, ${flushedPrimeL} prime &nbsp;|&nbsp; R: ${log.flushed_right} premium, ${flushedPrimeR} prime</span>` : ''}
+                        ? `<span class="text-danger" style="font-size:12px;">Flushed — L: ${log.flushed_left} premium, ${flushedPrimeL} prime &nbsp;|&nbsp; R: ${log.flushed_right} premium, ${flushedPrimeR} prime</span>` : ''}
                 </div>`;
             })
             .catch(() => {
