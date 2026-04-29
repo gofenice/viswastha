@@ -82,6 +82,8 @@ class CalculateBinaryIncome extends Command
         // Prime → premium conversion: find prime packages that auto-upgrade to this premium package
         $primeCarryOutLeft  = 0;
         $primeCarryOutRight = 0;
+        $oddPrimeLeft  = 0;
+        $oddPrimeRight = 0;
 
         if ($package->package_code === 'premium_package') {
             $primePackageIds = DB::table('packages')
@@ -98,11 +100,18 @@ class CalculateBinaryIncome extends Command
                     $newPrimeRight += $this->legActivationsSince($userId, 'right', $since, $primeId);
                 }
 
-                // 2 prime = 1 premium equivalent; odd leftover is flushed (not carried)
-                $newLeft  += intdiv($newPrimeLeft,  2);
-                $newRight += intdiv($newPrimeRight, 2);
-                $primeCarryOutLeft  = 0;
-                $primeCarryOutRight = 0;
+                // Add odd prime carry-in from previous log (carried when cap was not hit last run)
+                $primeCarryInLeft  = $lastLog ? (int)($lastLog->prime_carry_out_left  ?? 0) : 0;
+                $primeCarryInRight = $lastLog ? (int)($lastLog->prime_carry_out_right ?? 0) : 0;
+
+                $totalPrimeLeft  = $newPrimeLeft  + $primeCarryInLeft;
+                $totalPrimeRight = $newPrimeRight + $primeCarryInRight;
+
+                // 2 prime = 1 premium equivalent; track odd prime separately for carry/flush
+                $newLeft  += intdiv($totalPrimeLeft,  2);
+                $newRight += intdiv($totalPrimeRight, 2);
+                $oddPrimeLeft  = $totalPrimeLeft  % 2;
+                $oddPrimeRight = $totalPrimeRight % 2;
             }
         }
 
@@ -135,6 +144,9 @@ class CalculateBinaryIncome extends Command
         if ($rate <= 0 || $dayCap <= 0) {
             return; // Package has no binary income (e.g. Prime) — skip entirely
         }
+
+        $capHit      = false;
+        $flushedLeft = $flushedRight = 0;
 
         if (!$lastLog) {
             // ── First-run "2:1" unlock rule ────────────────────────────────────────
@@ -212,6 +224,17 @@ class CalculateBinaryIncome extends Command
                 $carryOutRight = $remRight;
                 $flushedLeft   = $remLeft;
                 $flushedRight  = 0;
+            }
+        }
+
+        // Prime carry-out: carry odd prime when cap not hit; flush it with the lower side when cap is hit
+        if ($oddPrimeLeft > 0 || $oddPrimeRight > 0) {
+            if (!$capHit) {
+                $primeCarryOutLeft  = $oddPrimeLeft;
+                $primeCarryOutRight = $oddPrimeRight;
+            } else {
+                $primeCarryOutLeft  = ($flushedLeft  > 0) ? 0 : $oddPrimeLeft;
+                $primeCarryOutRight = ($flushedRight > 0) ? 0 : $oddPrimeRight;
             }
         }
 

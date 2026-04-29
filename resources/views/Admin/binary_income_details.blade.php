@@ -613,8 +613,8 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                 }
 
                 // Remaining users → separate rows per side so each gets its own correct status
-                const lCarryStatus = log.carry_out_left  > 0 ? 'carry' : 'flushed';
-                const rCarryStatus = log.carry_out_right > 0 ? 'carry' : 'flushed';
+                const lCarryStatus = (log.carry_out_left  > 0 || log.prime_carry_out_left  > 0) ? 'carry' : 'flushed';
+                const rCarryStatus = (log.carry_out_right > 0 || log.prime_carry_out_right > 0) ? 'carry' : 'flushed';
                 while (lPremPool.length || lPrimePool.length) {
                     const lc = take1PremFirst(lPremPool, lPrimePool);
                     if (!lc.length) break;
