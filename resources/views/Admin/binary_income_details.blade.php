@@ -406,12 +406,14 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 <div class="row mb-1">
                     <div class="col-6 pr-1">
                         ${sectionCard('Carry In Left', 'info',
-                            `<span class="font-weight-bold" style="font-size:13px;">${log.carry_in_left}</span> <span style="font-size:13px;">premium-equiv</span>`
+                            splitRow(log.carry_in_left, 0,
+                                log.carry_in_left > 0 ? 'text-info' : '', '')
                         )}
                     </div>
                     <div class="col-6 pl-1">
                         ${sectionCard('Carry In Right', 'info',
-                            `<span class="font-weight-bold" style="font-size:13px;">${log.carry_in_right}</span> <span style="font-size:13px;">premium-equiv</span>`
+                            splitRow(log.carry_in_right, 0,
+                                log.carry_in_right > 0 ? 'text-info' : '', '')
                         )}
                     </div>
                 </div>` : ''}
@@ -498,8 +500,8 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                         return `<span style="font-size:12px;">Min(${L}, ${R}) = <b>${log.matched_pairs}</b> matched</span><br>`;
                     })()}
                     <span style="font-size:12px;">Capped at <b>${log.capped_pairs}</b> → ₹<b>${parseFloat(log.income).toLocaleString('en-IN')}</b></span><br>
-                    ${(log.carry_out_left > 0 || (log.prime_carry_out_left ?? 0) > 0) ? `<span style="font-size:12px;">Left carries <b>${log.carry_out_left}</b> premium${(log.prime_carry_out_left ?? 0) > 0 ? ` + <b>${log.prime_carry_out_left}</b> prime` : ''} forward</span><br>` : ''}
-                    ${(log.carry_out_right > 0 || (log.prime_carry_out_right ?? 0) > 0) ? `<span style="font-size:12px;">Right carries <b>${log.carry_out_right}</b> premium${(log.prime_carry_out_right ?? 0) > 0 ? ` + <b>${log.prime_carry_out_right}</b> prime` : ''} forward</span><br>` : ''}
+                    ${(log.carry_out_left > 0 || (log.prime_carry_out_left ?? 0) > 0) ? `<span style="font-size:12px;">Left carries <b>${log.carry_out_left}</b> ${isBasic ? 'basic' : 'premium'}${(log.prime_carry_out_left ?? 0) > 0 ? ` + <b>${log.prime_carry_out_left}</b> prime` : ''} forward</span><br>` : ''}
+                    ${(log.carry_out_right > 0 || (log.prime_carry_out_right ?? 0) > 0) ? `<span style="font-size:12px;">Right carries <b>${log.carry_out_right}</b> ${isBasic ? 'basic' : 'premium'}${(log.prime_carry_out_right ?? 0) > 0 ? ` + <b>${log.prime_carry_out_right}</b> prime` : ''} forward</span><br>` : ''}
                     ${(log.flushed_left > 0 || flushedPrimeL > 0 || log.flushed_right > 0 || flushedPrimeR > 0)
                         ? `<span class="text-danger" style="font-size:12px;">Flushed — L: ${log.flushed_left} premium, ${flushedPrimeL} prime &nbsp;|&nbsp; R: ${log.flushed_right} premium, ${flushedPrimeR} prime</span>` : ''}
                 </div>`;
