@@ -553,15 +553,18 @@ document.querySelectorAll('.btn-pairs').forEach(function(btn) {
                     }
                 }
 
-                // Remaining users → carry or flushed rows, premium first
+                // Remaining users → separate rows per side so each gets its own correct status
                 const lCarryStatus = log.carry_out_left  > 0 ? 'carry' : 'flushed';
                 const rCarryStatus = log.carry_out_right > 0 ? 'carry' : 'flushed';
-                while (lPremPool.length || lPrimePool.length || rPremPool.length || rPrimePool.length) {
+                while (lPremPool.length || lPrimePool.length) {
                     const lc = take1PremFirst(lPremPool, lPrimePool);
+                    if (!lc.length) break;
+                    allRows.push({lc, rc: [], status: lCarryStatus});
+                }
+                while (rPremPool.length || rPrimePool.length) {
                     const rc = take1PremFirst(rPremPool, rPrimePool);
-                    if (!lc.length && !rc.length) break;
-                    const status = lc.length ? lCarryStatus : rCarryStatus;
-                    allRows.push({lc, rc, status});
+                    if (!rc.length) break;
+                    allRows.push({lc: [], rc, status: rCarryStatus});
                 }
 
                 html += `<table class="table table-sm table-bordered">
