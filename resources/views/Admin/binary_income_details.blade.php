@@ -411,13 +411,13 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                             New R(${log.new_right}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> right<br>
                             ${(() => {
                                 const L = log.total_left, R = log.total_right;
-                                const isFirst = log.carry_in_left === 0 && log.carry_in_right === 0 && log.matched_pairs < Math.min(L, R);
-                                if (isFirst) {
+                                if (log.is_first_run) {
                                     const leftPrimary = L >= R;
                                     const primary = leftPrimary ? 'Left' : 'Right';
                                     const secondary = leftPrimary ? 'Right' : 'Left';
-                                    return `<span class="text-warning">Unlock 2:1 — 2 from ${primary} + 1 from ${secondary} = 1st pair</span><br>` +
-                                           `Remaining: ${leftPrimary ? L-2 : L-1}L vs ${leftPrimary ? R-1 : R-2}R → ${log.matched_pairs - 1} more pair(s)<br>`;
+                                    const extraPairs = log.matched_pairs - 1;
+                                    return `<span class="text-warning">First run 2:1 unlock — 2 from ${primary} + 1 from ${secondary} = 1st pair</span><br>` +
+                                           (extraPairs > 0 ? `Then 1:1 → <b>${extraPairs}</b> more pair(s)<br>` : '');
                                 }
                                 return `Min(${L}, ${R}) = <b>${log.matched_pairs}</b> matched<br>`;
                             })()}
