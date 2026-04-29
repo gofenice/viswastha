@@ -286,14 +286,19 @@ class AdminController extends Controller
         $leftPrime    = $hasPrime ? $countActivations($leftChildId,  $primePackageIds) : 0;
         $rightPrime   = $hasPrime ? $countActivations($rightChildId, $primePackageIds) : 0;
 
+        $primeCarryInLeft  = $prevLog ? (int)($prevLog->prime_carry_out_left  ?? 0) : 0;
+        $primeCarryInRight = $prevLog ? (int)($prevLog->prime_carry_out_right ?? 0) : 0;
+
         return response()->json([
-            'log'           => array_merge($log->toArray(), ['is_first_run' => !$prevLog]),
-            'wallet'        => $wallet,
-            'has_prime'     => $hasPrime,
-            'left_premium'  => $leftPremium,
-            'right_premium' => $rightPremium,
-            'left_prime'    => $leftPrime,
-            'right_prime'   => $rightPrime,
+            'log'               => array_merge($log->toArray(), ['is_first_run' => !$prevLog]),
+            'wallet'            => $wallet,
+            'has_prime'         => $hasPrime,
+            'left_premium'      => $leftPremium,
+            'right_premium'     => $rightPremium,
+            'left_prime'        => $leftPrime,
+            'right_prime'       => $rightPrime,
+            'prime_carry_in_left'  => $primeCarryInLeft,
+            'prime_carry_in_right' => $primeCarryInRight,
         ]);
     }
 

@@ -359,8 +359,12 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 const rightPremium  = data.right_premium ?? log.new_right;
                 const leftPrime     = data.left_prime    ?? 0;
                 const rightPrime    = data.right_prime   ?? 0;
-                const flushedPrimeL = hasPrime ? leftPrime  % 2 : 0;
-                const flushedPrimeR = hasPrime ? rightPrime % 2 : 0;
+                const primeCarryInL = data.prime_carry_in_left  ?? 0;
+                const primeCarryInR = data.prime_carry_in_right ?? 0;
+                const oddPrimeL = hasPrime ? (leftPrime  + primeCarryInL) % 2 : 0;
+                const oddPrimeR = hasPrime ? (rightPrime + primeCarryInR) % 2 : 0;
+                const flushedPrimeL = Math.max(0, oddPrimeL - (log.prime_carry_out_left  ?? 0));
+                const flushedPrimeR = Math.max(0, oddPrimeR - (log.prime_carry_out_right ?? 0));
                 const pBadge  = `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:10px;vertical-align:middle;">Premium</span>`;
                 const prBadge = `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:10px;vertical-align:middle;">Prime</span>`;
                 function sectionCard(title, color, rows) {
@@ -433,14 +437,16 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 <div class="row mb-1">
                     <div class="col-6 pr-1">
                         ${sectionCard('Carry Out Left', 'warning',
-                            splitRow(log.carry_out_left, 0,
-                                log.carry_out_left > 0 ? 'text-warning' : '', '')
+                            splitRow(log.carry_out_left, log.prime_carry_out_left ?? 0,
+                                log.carry_out_left > 0 ? 'text-warning' : '',
+                                (log.prime_carry_out_left ?? 0) > 0 ? 'text-warning' : '')
                         )}
                     </div>
                     <div class="col-6 pl-1">
                         ${sectionCard('Carry Out Right', 'warning',
-                            splitRow(log.carry_out_right, 0,
-                                log.carry_out_right > 0 ? 'text-warning' : '', '')
+                            splitRow(log.carry_out_right, log.prime_carry_out_right ?? 0,
+                                log.carry_out_right > 0 ? 'text-warning' : '',
+                                (log.prime_carry_out_right ?? 0) > 0 ? 'text-warning' : '')
                         )}
                     </div>
                 </div>
@@ -487,8 +493,8 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                         return `<span style="font-size:12px;">Min(${L}, ${R}) = <b>${log.matched_pairs}</b> matched</span><br>`;
                     })()}
                     <span style="font-size:12px;">Capped at <b>${log.capped_pairs}</b> → ₹<b>${parseFloat(log.income).toLocaleString('en-IN')}</b></span><br>
-                    ${log.carry_out_left  > 0 ? `<span style="font-size:12px;">Left carries <b>${log.carry_out_left}</b> forward</span><br>`  : ''}
-                    ${log.carry_out_right > 0 ? `<span style="font-size:12px;">Right carries <b>${log.carry_out_right}</b> forward</span><br>` : ''}
+                    ${(log.carry_out_left > 0 || (log.prime_carry_out_left ?? 0) > 0) ? `<span style="font-size:12px;">Left carries <b>${log.carry_out_left}</b> premium${(log.prime_carry_out_left ?? 0) > 0 ? ` + <b>${log.prime_carry_out_left}</b> prime` : ''} forward</span><br>` : ''}
+                    ${(log.carry_out_right > 0 || (log.prime_carry_out_right ?? 0) > 0) ? `<span style="font-size:12px;">Right carries <b>${log.carry_out_right}</b> premium${(log.prime_carry_out_right ?? 0) > 0 ? ` + <b>${log.prime_carry_out_right}</b> prime` : ''} forward</span><br>` : ''}
                     ${(log.flushed_left > 0 || flushedPrimeL > 0 || log.flushed_right > 0 || flushedPrimeR > 0)
                         ? `<span class="text-danger" style="font-size:12px;">Flushed — L: ${log.flushed_left} premium, ${flushedPrimeL} prime &nbsp;|&nbsp; R: ${log.flushed_right} premium, ${flushedPrimeR} prime</span>` : ''}
                 </div>`;
