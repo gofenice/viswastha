@@ -361,8 +361,16 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                         <table class="table table-sm table-bordered">
                             <tbody>
                                 <tr class="table-info">
-                                    <th>New Left</th><td>${log.new_left}</td>
-                                    <th>New Right</th><td>${log.new_right}</td>
+                                    <th>New Left</th>
+                                    <td>${data.has_prime
+                                        ? `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:0.75em;">Premium</span> ${data.left.length}
+                                           <span class="ml-1 badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:0.75em;">Prime</span> ${data.left_prime.length}`
+                                        : log.new_left}</td>
+                                    <th>New Right</th>
+                                    <td>${data.has_prime
+                                        ? `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:0.75em;">Premium</span> ${data.right.length}
+                                           <span class="ml-1 badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:0.75em;">Prime</span> ${data.right_prime.length}`
+                                        : log.new_right}</td>
                                 </tr>
                                 <tr>
                                     <th>Carry In Left</th><td>${log.carry_in_left}</td>
@@ -407,8 +415,11 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                     <div class="col-md-5">
                         <div class="callout callout-info mt-2" style="font-size:12px;">
                             <b>How it worked:</b><br>
-                            New L(${log.new_left}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> left<br>
-                            New R(${log.new_right}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> right<br>
+                            ${data.has_prime
+                                ? `New L: ${data.left.length} premium + ${data.left_prime.length} prime (÷2=${Math.floor(data.left_prime.length/2)}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> equiv left<br>
+                                   New R: ${data.right.length} premium + ${data.right_prime.length} prime (÷2=${Math.floor(data.right_prime.length/2)}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> equiv right<br>`
+                                : `New L(${log.new_left}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> left<br>
+                                   New R(${log.new_right}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> right<br>`}
                             ${(() => {
                                 const L = log.total_left, R = log.total_right;
                                 if (log.is_first_run) {
