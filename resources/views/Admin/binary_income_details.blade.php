@@ -341,11 +341,12 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
         const date      = this.dataset.date;
         const pkg       = this.dataset.package;
         const packageId = this.dataset.packageId;
+        const logId     = this.dataset.log;
         document.getElementById('incomeDetailTitle').textContent = 'Detail — ' + pkg + ' — ' + date;
         document.getElementById('incomeDetailBody').innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading…</div>';
         $('#incomeDetailModal').modal('show');
 
-        fetch('{{ route('admin.binary_income.popup') }}?user_id=' + userId + '&date=' + date + '&package_id=' + packageId)
+        fetch('{{ route('admin.binary_income.popup') }}?log_id=' + logId + '&user_id=' + userId + '&date=' + date + '&package_id=' + packageId)
             .then(r => r.json())
             .then(data => {
                 if (data.error) {
