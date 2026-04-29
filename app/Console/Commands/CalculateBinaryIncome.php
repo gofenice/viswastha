@@ -153,15 +153,21 @@ class CalculateBinaryIncome extends Command
                 $capped         = min($matched, $dayCap);
                 $income         = $capped * $rate;
                 $normalCapped   = max(0, $capped - 1);
+                $capHit         = $matched > $capped;
 
                 $primaryRem   = max(0, $primaryEff   - $normalCapped);
                 $secondaryRem = max(0, $secondaryEff - $normalCapped);
 
-                // Stronger remaining carries; weaker flushes
-                if ($primaryRem >= $secondaryRem) {
+                if (!$capHit) {
+                    // Daily cap not the binding constraint — both sides carry, no flushing
+                    [$carryPrimary, $carrySecondary, $flushPrimary, $flushSecondary] =
+                        [$primaryRem, $secondaryRem, 0, 0];
+                } elseif ($primaryRem >= $secondaryRem) {
+                    // Cap hit — flush the lower remaining side (secondary)
                     [$carryPrimary, $carrySecondary, $flushPrimary, $flushSecondary] =
                         [$primaryRem, 0, 0, $secondaryRem];
                 } else {
+                    // Cap hit — flush the lower remaining side (primary)
                     [$carryPrimary, $carrySecondary, $flushPrimary, $flushSecondary] =
                         [0, $secondaryRem, $primaryRem, 0];
                 }
@@ -170,7 +176,7 @@ class CalculateBinaryIncome extends Command
                     ? [$carryPrimary, $carrySecondary, $flushPrimary,   $flushSecondary]
                     : [$carrySecondary, $carryPrimary, $flushSecondary, $flushPrimary];
             } else {
-                // One side is empty — can't unlock yet; hold all activations
+                // One side is empty — can't unlock yet; hold all activations as carry
                 $matched = $capped = 0;
                 $income  = 0;
                 $carryOutLeft  = $totalLeft;
@@ -182,17 +188,29 @@ class CalculateBinaryIncome extends Command
             $matched = min($totalLeft, $totalRight);
             $capped  = min($matched, $dayCap);
             $income  = $capped * $rate;
+            $capHit  = $matched > $capped;
 
-            // Stronger leg carries forward; weaker leg excess flushed
-            if ($totalLeft >= $totalRight) {
-                $carryOutLeft  = $totalLeft - $capped;
+            $remLeft  = $totalLeft  - $capped;
+            $remRight = $totalRight - $capped;
+
+            if (!$capHit) {
+                // Daily cap not reached — both sides carry their remaining, no flushing
+                // (one side will always be 0 since matched = min(left, right))
+                $carryOutLeft  = $remLeft;
+                $carryOutRight = $remRight;
+                $flushedLeft   = 0;
+                $flushedRight  = 0;
+            } elseif ($remLeft >= $remRight) {
+                // Cap hit — flush lower remaining side (right)
+                $carryOutLeft  = $remLeft;
                 $carryOutRight = 0;
                 $flushedLeft   = 0;
-                $flushedRight  = max(0, $totalRight - $capped);
+                $flushedRight  = $remRight;
             } else {
+                // Cap hit — flush lower remaining side (left)
                 $carryOutLeft  = 0;
-                $carryOutRight = $totalRight - $capped;
-                $flushedLeft   = max(0, $totalLeft - $capped);
+                $carryOutRight = $remRight;
+                $flushedLeft   = $remLeft;
                 $flushedRight  = 0;
             }
         }
