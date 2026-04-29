@@ -274,6 +274,7 @@
                                 <td class="text-center {{ $log->flushed_right > 0 ? 'text-danger' : '' }}">{{ $log->flushed_right }}</td>
                                 <td class="text-nowrap">
                                     <button class="btn btn-xs btn-info btn-popup"
+                                            data-log="{{ $log->id }}"
                                             data-user="{{ $log->user_id }}"
                                             data-date="{{ \Carbon\Carbon::parse($log->calc_date)->toDateString() }}"
                                             data-package-id="{{ $log->package_id }}"
