@@ -235,7 +235,7 @@ class AdminController extends Controller
 
     public function adminBinaryIncomePopup(Request $request)
     {
-        $log = \App\Models\BinaryPairLog::with('user')
+        $log = \App\Models\BinaryPairLog::with('package')
             ->where('user_id', $request->user_id)
             ->where('calc_date', $request->date)
             ->when($request->package_id, fn($q) => $q->where('package_id', $request->package_id))
@@ -247,9 +247,53 @@ class AdminController extends Controller
 
         $wallet = \App\Models\BinaryWallet::where('user_id', $log->user_id)->first();
 
+        // Determine window boundaries
+        $prevLog = \App\Models\BinaryPairLog::where('user_id', $log->user_id)
+            ->where('package_id', $log->package_id)
+            ->where('id', '<', $log->id)
+            ->orderByDesc('id')->first();
+        $since = $prevLog ? $prevLog->created_at->toDateTimeString() : '2026-04-20 00:00:00';
+        $until = $log->created_at->toDateTimeString();
+
+        // Children IDs
+        $leftChildId  = DB::table('users')->where('parent_id', $log->user_id)->where('position', 'left')->value('id');
+        $rightChildId = DB::table('users')->where('parent_id', $log->user_id)->where('position', 'right')->value('id');
+
+        // Prime packages that feed this package
+        $primePackageIds = DB::table('packages')
+            ->where('auto_upgrade_to_package_id', $log->package_id)
+            ->where('status', 1)
+            ->pluck('id')->toArray();
+        $hasPrime = !empty($primePackageIds);
+
+        $countActivations = function ($childId, $pkgIds) use ($since, $until) {
+            if (!$childId || empty($pkgIds)) return 0;
+            $result = DB::select("
+                WITH RECURSIVE subtree AS (
+                    SELECT id FROM users WHERE id = ?
+                    UNION ALL SELECT u.id FROM users u INNER JOIN subtree s ON u.parent_id = s.id
+                )
+                SELECT COUNT(*) AS cnt FROM user_packages up
+                WHERE up.user_id IN (SELECT id FROM subtree)
+                  AND up.package_id IN (" . implode(',', $pkgIds) . ")
+                  AND up.status = 1 AND up.created_at > ? AND up.created_at <= ?
+            ", [$childId, $since, $until]);
+            return (int) ($result[0]->cnt ?? 0);
+        };
+
+        $leftPremium  = $countActivations($leftChildId,  [$log->package_id]);
+        $rightPremium = $countActivations($rightChildId, [$log->package_id]);
+        $leftPrime    = $hasPrime ? $countActivations($leftChildId,  $primePackageIds) : 0;
+        $rightPrime   = $hasPrime ? $countActivations($rightChildId, $primePackageIds) : 0;
+
         return response()->json([
-            'log'    => $log,
-            'wallet' => $wallet,
+            'log'           => array_merge($log->toArray(), ['is_first_run' => !$prevLog]),
+            'wallet'        => $wallet,
+            'has_prime'     => $hasPrime,
+            'left_premium'  => $leftPremium,
+            'right_premium' => $rightPremium,
+            'left_prime'    => $leftPrime,
+            'right_prime'   => $rightPrime,
         ]);
     }
 

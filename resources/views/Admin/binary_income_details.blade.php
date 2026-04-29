@@ -354,9 +354,13 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 }
                 const log = data.log;
                 const w   = data.wallet || {};
-                const flushedPrimeL = data.has_prime ? data.left_prime.length  % 2 : 0;
-                const flushedPrimeR = data.has_prime ? data.right_prime.length % 2 : 0;
-                const hasPrime = data.has_prime;
+                const hasPrime      = data.has_prime || false;
+                const leftPremium   = data.left_premium  ?? log.new_left;
+                const rightPremium  = data.right_premium ?? log.new_right;
+                const leftPrime     = data.left_prime    ?? 0;
+                const rightPrime    = data.right_prime   ?? 0;
+                const flushedPrimeL = hasPrime ? leftPrime  % 2 : 0;
+                const flushedPrimeR = hasPrime ? rightPrime % 2 : 0;
                 const pBadge  = `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:0.72em;vertical-align:middle;">Premium</span>`;
                 const prBadge = `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:0.72em;vertical-align:middle;">Prime</span>`;
                 function sectionCard(title, color, rows) {
@@ -378,12 +382,12 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 <div class="row mb-1">
                     <div class="col-6 pr-1">
                         ${sectionCard('New Left', 'primary',
-                            splitRow(data.left.length, data.left_prime.length)
+                            splitRow(leftPremium, leftPrime)
                         )}
                     </div>
                     <div class="col-6 pl-1">
                         ${sectionCard('New Right', 'primary',
-                            splitRow(data.right.length, data.right_prime.length)
+                            splitRow(rightPremium, rightPrime)
                         )}
                     </div>
                 </div>
@@ -466,8 +470,8 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 <div class="callout callout-info mb-0" style="font-size:12px;">
                     <b>How it worked:</b><br>
                     ${hasPrime
-                        ? `New L: ${data.left.length} premium + ${data.left_prime.length} prime (÷2=${Math.floor(data.left_prime.length/2)}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> equiv<br>
-                           New R: ${data.right.length} premium + ${data.right_prime.length} prime (÷2=${Math.floor(data.right_prime.length/2)}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> equiv<br>`
+                        ? `New L: ${leftPremium} premium + ${leftPrime} prime (÷2=${Math.floor(leftPrime/2)}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> equiv<br>
+                           New R: ${rightPremium} premium + ${rightPrime} prime (÷2=${Math.floor(rightPrime/2)}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> equiv<br>`
                         : `New L(${log.new_left}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> left<br>
                            New R(${log.new_right}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> right<br>`}
                     ${(() => {
