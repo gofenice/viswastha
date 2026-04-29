@@ -365,7 +365,10 @@ document.querySelectorAll('.btn-popup').forEach(function (btn) {
                 const oddPrimeR = hasPrime ? (rightPrime + primeCarryInR) % 2 : 0;
                 const flushedPrimeL = Math.max(0, oddPrimeL - (log.prime_carry_out_left  ?? 0));
                 const flushedPrimeR = Math.max(0, oddPrimeR - (log.prime_carry_out_right ?? 0));
-                const pBadge  = `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:10px;vertical-align:middle;">Premium</span>`;
+                const isBasic = log.package_type === 'basic_package';
+                const pBadge  = isBasic
+                    ? `<span class="badge" style="background:#cce5ff;color:#004085;border:1px solid #007bff;font-size:10px;vertical-align:middle;">Basic</span>`
+                    : `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:10px;vertical-align:middle;">Premium</span>`;
                 const prBadge = `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:10px;vertical-align:middle;">Prime</span>`;
                 function sectionCard(title, color, rows) {
                     return `<div class="card card-outline card-${color} mb-2">
