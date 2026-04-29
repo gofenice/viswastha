@@ -235,14 +235,15 @@ class AdminController extends Controller
 
     public function adminBinaryIncomePopup(Request $request)
     {
-        $log = \App\Models\BinaryPairLog::with('package')
-            ->when($request->log_id, fn($q) => $q->where('id', $request->log_id))
-            ->when(!$request->log_id, fn($q) => $q
+        if ($request->log_id) {
+            $log = \App\Models\BinaryPairLog::with('package')->find($request->log_id);
+        } else {
+            $log = \App\Models\BinaryPairLog::with('package')
                 ->where('user_id', $request->user_id)
                 ->where('calc_date', $request->date)
-                ->when($request->package_id, fn($q2) => $q2->where('package_id', $request->package_id))
-            )
-            ->first();
+                ->when($request->package_id, fn($q) => $q->where('package_id', $request->package_id))
+                ->first();
+        }
 
         if (!$log) {
             return response()->json(['error' => 'No record found'], 404);
