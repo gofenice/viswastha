@@ -12,10 +12,11 @@
 
 .node-card { position: absolute; width: 348px; background: #fff; border: 2px solid #007bff; border-radius: 14px; padding: 12px 10px 10px; box-shadow: 0 2px 10px rgba(0,123,255,.15); text-align: center; z-index: 2; }
 .node-card.root-node { border-color: #fd7e14; }
-.node-img { width: 132px; height: 132px; border-radius: 50%; object-fit: cover; border: 4px solid #007bff; margin-bottom: 10px; }
+.node-img { width: 132px; height: 132px; border-radius: 50%; object-fit: cover; border: 4px solid #007bff; margin-bottom: 10px; cursor: pointer; }
 .root-node .node-img { border-color: #fd7e14; }
 .node-img-wrap { position: relative; display: inline-block; }
-.has-more-badge { position: absolute; top: 50%; right: -14px; transform: translateY(-50%); background: #dc3545; color: #fff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; box-shadow: 0 2px 6px rgba(220,53,69,.5); z-index: 5; }
+.has-more-badge { position: absolute; top: 50%; right: -24px; transform: translateY(-50%); background: #dc3545; color: #fff; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; box-shadow: 0 3px 10px rgba(220,53,69,.5); z-index: 5; transition: transform .15s, box-shadow .15s; }
+.has-more-badge:hover { transform: translateY(-50%) scale(1.2); box-shadow: 0 5px 16px rgba(220,53,69,.7); }
 .node-id   { font-size: 43px; font-weight: 700; color: #333; margin-bottom: 2px; }
 .node-name { font-size: 43px; color: #555; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node-lr   { font-size: 34px; color: #555; margin-bottom: 6px; display: flex; justify-content: center; gap: 18px; }
@@ -30,17 +31,24 @@
 .btn-node-package { background: #eafaf1; color: #28a745; }
 .node-actions { display: flex; justify-content: center; gap: 10px; margin-top: 8px; }
 
-/* Package ring colors applied via inline style from DB */
-
-.vacant-node { position: absolute; width: 348px; background: #fff8f0; border: 2px dashed #fd7e14; border-radius: 14px; padding: 20px 10px; text-align: center; z-index: 2; }
+.vacant-node { position: absolute; width: 348px; background: #fff8f0; border: 2px dashed #fd7e14; border-radius: 14px; padding: 20px 10px; text-align: center; z-index: 2; cursor: pointer; transition: background .2s, transform .2s; }
+.vacant-node:hover { background: #fff0dc; transform: translateY(-2px); }
 .vacant-circle { width: 108px; height: 108px; border-radius: 50%; background: #fff3e0; border: 2px dashed #fd7e14; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-size: 40px; color: #fd7e14; }
 .vacant-label { font-size: 40px; font-weight: 700; color: #fd7e14; }
 .vacant-slot  { font-size: 34px; color: #aaa; margin-top: 4px; }
+.vacant-hint  { font-size: 28px; color: #fd7e14; margin-top: 6px; opacity: .7; }
 
 .pkg-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin: 2px; border: 1px solid; }
 .pkg-badge.basic   { background: #fff9e6; color: #856404; border-color: #ffc107; }
 .pkg-badge.premium { background: #d4edda; color: #155724; border-color: #28a745; }
 .pkg-badge.prime   { background: #fff3e0; color: #7a3300; border-color: #fd7e14; }
+
+.user-search-result { cursor: pointer; padding: 8px 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; }
+.user-search-result:hover { background: #f8f9fa; }
+.user-search-result img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.search-results-list { max-height: 260px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; }
+
+.migration-banner { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; font-size: 13px; color: #856404; display: flex; align-items: center; gap: 10px; }
 </style>
 
 <div class="content-wrapper">
@@ -60,6 +68,13 @@
 
     <section class="content">
         <div class="container-fluid binary-page-wrapper">
+
+            @if(!$settings->migration_complete)
+            <div class="migration-banner">
+                <i class="fas fa-tools fa-lg"></i>
+                <span><strong>Migration in progress:</strong> Click any vacant slot to place an existing team member into the binary tree. New user registration is temporarily disabled.</span>
+            </div>
+            @endif
 
             <div class="binary-topbar">
                 @if($parentNode)
@@ -91,7 +106,41 @@
     </section>
 </div>
 
-{{-- Package Modal (user: own pins only) --}}
+{{-- Place User Modal (transfer existing user only — no new user, no quick user) --}}
+<div class="modal fade" id="placeUserModal" tabindex="-1">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-user-plus"></i> Place Team Member</h5>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-1">
+                    Placing in: <strong id="placementInfo">-</strong>
+                </p>
+                <p class="text-info small mb-3"><i class="fas fa-info-circle"></i> Search and select an existing team member to place in this slot. Only unplaced members are shown.</p>
+
+                <input type="hidden" id="placementParentId">
+                <input type="hidden" id="placementPosition">
+                <input type="hidden" id="selectedUserId">
+
+                <input type="text" id="userSearchInput" class="form-control mb-1" placeholder="Search by name or ID…" autocomplete="off">
+                <div id="userSearchResults" class="search-results-list mb-2"></div>
+                <div id="userSelectedInfo" class="text-success font-weight-bold small mb-2" style="display:none;"></div>
+
+                <div id="placeSlotError" class="text-danger small mt-2" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnPlaceUser" disabled>
+                    <i class="fas fa-check"></i> Place
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Package Modal (activate for any team member using logged-in user's own pins) --}}
 <div class="modal fade" id="packageModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -148,10 +197,14 @@
 const IS_ADMIN   = false;
 const MY_USER_ID = {{ $me->id }};
 const RAW_TREE   = @json($binaryTree);
+const CSRF       = '{{ csrf_token() }}';
 
 const ROUTES = {
-    userPackages: '{{ route("admin.binary_tree.user_packages") }}',
-    reload:       '{{ route("user.binary_tree") }}',
+    userPackages:  '{{ route("admin.binary_tree.user_packages") }}',
+    reload:        '{{ route("user.binary_tree") }}',
+    transferUser:  '{{ route("admin.binary_tree.transfer_user") }}',
+    searchUsers:   '{{ route("user.binary_tree.search_users") }}',
+    checkSlots:    '{{ route("admin.binary_tree.check_slots") }}',
 };
 
 const PKG_BADGE_CLASS = { basic_package: 'basic', premium_package: 'premium', prime_package: 'prime' };
@@ -174,8 +227,11 @@ function buildLayout(node, level, xStart, xEnd, isRoot, parentInfo) {
     };
     const nodes = [entry];
     if (hasUser && level < MAX_LEVEL) {
-        nodes.push(...buildLayout(node.left,  level+1, xStart, xMid, false, { id: node.user.id, side:'left' }));
-        nodes.push(...buildLayout(node.right, level+1, xMid,  xEnd, false, { id: node.user.id, side:'right' }));
+        // When a slot is null from the server, create a vacant node placeholder so the slot renders
+        const leftData  = node.left  ?? { user: null, parent_id: node.user.id, position: 'left',  left: null, right: null };
+        const rightData = node.right ?? { user: null, parent_id: node.user.id, position: 'right', left: null, right: null };
+        nodes.push(...buildLayout(leftData,  level+1, xStart, xMid, false, { id: node.user.id, side:'left' }));
+        nodes.push(...buildLayout(rightData, level+1, xMid,  xEnd, false, { id: node.user.id, side:'right' }));
     }
     return nodes;
 }
@@ -190,11 +246,6 @@ function viewSubtree(e, userId) {
 // ── Package modal ─────────────────────────────────────────────────────────────
 function openPackageModal(e, userId, userName) {
     e.stopPropagation();
-    // Users can only activate for themselves
-    if (userId != MY_USER_ID) {
-        Swal.fire('Not allowed', 'You can only activate a package for yourself.', 'warning');
-        return;
-    }
     $('#pkgUserId').val(userId);
     $('#pkgUserName').text(userName);
     $('#pkgPackageId').val('');
@@ -205,6 +256,7 @@ function openPackageModal(e, userId, userName) {
     $('#pkgCurrentSection').hide();
     $('#pkgCurrentList').empty();
 
+    // Show the target user's existing packages
     $.get(ROUTES.userPackages, { user_id: userId }, function (packages) {
         if (packages && packages.length) {
             const $list = $('#pkgCurrentList').empty();
@@ -228,7 +280,8 @@ $('#pkgPackageId').on('change', function () {
     $('#pkgPinSection').show();
     $('#pkgProductSection').show();
 
-    $.get('/get-available-pins', { package_id: packageId, user_id: userId }, function (res) {
+    // Always fetch pins from the logged-in user (MY_USER_ID), not the target
+    $.get('/get-available-pins', { package_id: packageId, user_id: MY_USER_ID }, function (res) {
         const $pins = $('#pkgPinId').empty().append('<option value="">-- Choose Pin --</option>');
         (res.pins || []).forEach(p => $pins.append('<option value="' + p.id + '">' + p.unique_id + '</option>'));
         if (!res.pins || !res.pins.length) $pins.append('<option value="">No pins available</option>');
@@ -245,11 +298,87 @@ $('#updatePinForm').on('submit', function (e) {
     }
     $.ajax({
         url: $(this).attr('action'), type: 'POST', data: $(this).serialize(),
-        success: function (res) {
-            try { res = typeof res === 'string' ? JSON.parse(res) : res; } catch(e) {}
+        success: function () {
             Swal.fire('Activated!', 'Package activated successfully.', 'success').then(reloadPage);
         },
         error: function () { Swal.fire('Error', 'Activation failed. Please try again.', 'error'); }
+    });
+});
+
+// ── Place User modal ──────────────────────────────────────────────────────────
+function openPlaceModal(parentId, position) {
+    $('#placementParentId').val(parentId);
+    $('#placementPosition').val(position);
+    $('#placementInfo').text('Parent ID: ' + parentId + ' — ' + position.charAt(0).toUpperCase() + position.slice(1) + ' slot');
+    $('#selectedUserId').val('');
+    $('#userSearchInput').val('');
+    $('#userSearchResults').empty();
+    $('#userSelectedInfo').hide();
+    $('#placeSlotError').hide();
+    $('#btnPlaceUser').prop('disabled', true);
+    $('#placeUserModal').modal('show');
+}
+
+let searchDebounce;
+$('#userSearchInput').on('input', function () {
+    clearTimeout(searchDebounce);
+    const q = $(this).val().trim();
+    if (q.length < 2) { $('#userSearchResults').empty(); return; }
+    searchDebounce = setTimeout(function () {
+        $.get(ROUTES.searchUsers, { q }, function (data) {
+            const $list = $('#userSearchResults').empty();
+            if (!data.length) {
+                $list.append('<div class="p-2 text-muted small">No unplaced members found.</div>');
+                return;
+            }
+            data.forEach(function (u) {
+                $('<div class="user-search-result">')
+                    .html('<img src="' + u.image + '"><div><div style="font-size:13px;font-weight:600;">' + u.name + '</div><div style="font-size:11px;color:#888;">' + u.connection + '</div></div>')
+                    .on('click', function () {
+                        $('#selectedUserId').val(u.id);
+                        $('#userSearchInput').val(u.name + ' — ' + u.connection);
+                        $list.empty();
+                        $('#userSelectedInfo').text('Selected: ' + u.name + ' (' + u.connection + ')').show();
+                        $('#btnPlaceUser').prop('disabled', false);
+                        $('#placeSlotError').hide();
+                    })
+                    .appendTo($list);
+            });
+        });
+    }, 250);
+});
+
+$('#btnPlaceUser').on('click', function () {
+    const userId   = $('#selectedUserId').val();
+    const parentId = $('#placementParentId').val();
+    const position = $('#placementPosition').val();
+
+    if (!userId) { Swal.fire('Warning', 'Please select a team member first.', 'warning'); return; }
+
+    $(this).prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Placing…');
+
+    $.ajax({
+        url: ROUTES.transferUser,
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': CSRF },
+        contentType: 'application/json',
+        data: JSON.stringify({ user_id: userId, parent_id: parentId, position: position }),
+        success: function (res) {
+            if (res.status === 'success') {
+                Swal.fire('Placed!', res.message, 'success').then(function () {
+                    $('#placeUserModal').modal('hide');
+                    reloadPage();
+                });
+            } else {
+                $('#placeSlotError').text(res.message).show();
+                $('#btnPlaceUser').prop('disabled', false).html('<i class="fas fa-check"></i> Place');
+            }
+        },
+        error: function (xhr) {
+            const msg = xhr.responseJSON?.message || 'Something went wrong.';
+            Swal.fire('Error', msg, 'error');
+            $('#btnPlaceUser').prop('disabled', false).html('<i class="fas fa-check"></i> Place');
+        }
     });
 });
 
@@ -273,16 +402,14 @@ allNodes.forEach(function (n) {
         const pkgColor = n.user.package_color || null;
         el.className   = 'node-card' + (n.isRoot ? ' root-node' : '');
         const imgSrc   = n.user.user_image ? '/' + n.user.user_image : '/assets/dist/img/images.jpg';
-        const imgStyle = pkgColor ? ' style="border-color:' + pkgColor + '!important;box-shadow:0 0 0 3px ' + pkgColor + '55;"' : '';
-        const imgTag   = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img"' + imgStyle + ' alt="user">';
+        const imgStyle = pkgColor ? ' style="border-color:' + pkgColor + '!important;box-shadow:0 0 0 3px ' + pkgColor + '55;cursor:pointer;"' : ' style="cursor:pointer;"';
+        const imgTag   = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img"' + imgStyle + ' alt="user" onclick="viewSubtree(event,' + n.user.id + ')" title="View ' + (n.user.name||'').replace(/'/g,"&#39;").replace(/"/g,'&quot;') + '\'s tree">';
         const imgHtml  = hasMore
             ? '<div class="node-img-wrap">' + imgTag + '<div class="has-more-badge" onclick="viewSubtree(event,' + n.user.id + ')"><i class="fas fa-chevron-down"></i></div></div>'
             : imgTag;
 
-        // Only show package button on own node
-        const pkgBtn = (n.user.id == MY_USER_ID)
-            ? '<button class="node-action-btn btn-node-package" title="Activate package" onclick="openPackageModal(event,' + n.user.id + ',\'' + (n.user.name||'').replace(/'/g,"\\'") + '\')"><i class="fas fa-box-open"></i></button>'
-            : '';
+        const safeName = (n.user.name || '').replace(/'/g, "\\'");
+        const pkgBtn   = '<button class="node-action-btn btn-node-package" title="Activate package (using your pins)" onclick="openPackageModal(event,' + n.user.id + ',\'' + safeName + '\')"><i class="fas fa-box-open"></i></button>';
 
         el.innerHTML =
             imgHtml +
@@ -300,15 +427,21 @@ allNodes.forEach(function (n) {
                     '<span class="leg-premium">PSV: ₹' + (n.user.right_premium_vol ?? 0).toLocaleString('en-IN') + '</span>' +
                 '</div>' +
             '</div>' +
-            (pkgBtn ? '<div class="node-actions">' +
+            '<div class="node-actions">' +
                 '<button class="node-action-btn btn-node-view" title="View subtree" onclick="viewSubtree(event,' + n.user.id + ')"><i class="fas fa-sitemap"></i></button>' +
                 pkgBtn +
-            '</div>' : '<div class="node-actions"><button class="node-action-btn btn-node-view" title="View subtree" onclick="viewSubtree(event,' + n.user.id + ')"><i class="fas fa-sitemap"></i></button></div>');
+            '</div>';
 
         byId[n.user.id] = n;
     } else {
+        const pid = n.vacantParentId, pos = n.vacantPosition;
         el.className = 'vacant-node';
-        el.innerHTML = '<div class="vacant-circle"><i class="fas fa-plus"></i></div><div class="vacant-label">VACANT</div><div class="vacant-slot">' + (n.vacantPosition ? n.vacantPosition.charAt(0).toUpperCase() + n.vacantPosition.slice(1) + ' slot' : '') + '</div>';
+        el.setAttribute('onclick', 'openPlaceModal(' + pid + ',\'' + pos + '\')');
+        el.innerHTML =
+            '<div class="vacant-circle"><i class="fas fa-plus"></i></div>' +
+            '<div class="vacant-label">VACANT</div>' +
+            '<div class="vacant-slot">' + (pos ? pos.charAt(0).toUpperCase() + pos.slice(1) + ' slot' : '') + '</div>' +
+            '<div class="vacant-hint"><i class="fas fa-hand-pointer"></i> Tap to place member</div>';
     }
     el.style.left = n.x + 'px';
     el.style.top  = n.y + 'px';

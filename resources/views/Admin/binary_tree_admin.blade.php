@@ -128,24 +128,24 @@
 }
 .has-more-badge {
     position: absolute;
-    right: -16px;
+    right: -24px;
     top: 50%;
     transform: translateY(-50%);
-    width: 30px;
-    height: 30px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     background: #dc3545;
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: 22px;
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(220,53,69,.4);
+    box-shadow: 0 3px 10px rgba(220,53,69,.5);
     transition: transform .15s, box-shadow .15s;
     z-index: 4;
 }
-.has-more-badge:hover { transform: translateY(-50%) scale(1.15); box-shadow: 0 4px 10px rgba(220,53,69,.6); }
+.has-more-badge:hover { transform: translateY(-50%) scale(1.2); box-shadow: 0 5px 16px rgba(220,53,69,.7); }
 
 /* ── Vacant node ── */
 .vacant-node {
@@ -770,8 +770,8 @@ function renderBinaryTree() {
             const imgSrc = n.user.user_image
                 ? '/' + n.user.user_image
                 : '/assets/dist/img/images.jpg';
-            const imgStyle = pkgColor ? ' style="border-color:' + pkgColor + '!important;box-shadow:0 0 0 2px ' + pkgColor + '55;"' : '';
-            const imgTag = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img"' + imgStyle + ' alt="user">';
+            const imgStyle = pkgColor ? ' style="border-color:' + pkgColor + '!important;box-shadow:0 0 0 2px ' + pkgColor + '55;cursor:pointer;"' : ' style="cursor:pointer;"';
+            const imgTag = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img"' + imgStyle + ' alt="user" onclick="viewSubtree(event,' + n.user.id + ')" title="View ' + (n.user.name||'').replace(/'/g,"&#39;").replace(/"/g,'&quot;') + '\'s tree">';
             const imgHtml = hasMore
                 ? '<div class="node-img-wrap">' + imgTag + '<div class="has-more-badge" onclick="viewSubtree(event,' + n.user.id + ')" title="Has children — click to view"><i class="fas fa-chevron-down"></i></div></div>'
                 : imgTag;

@@ -240,18 +240,19 @@
                             <ul class="nav nav-treeview team">
                                 @php $migrationDone = \App\Models\BinaryTreeSetting::current()->migration_complete; @endphp
                                 <li class="nav-item">
-                                    @if($migrationDone)
-                                        <a href="{{ route('user.binary_tree') }}" class="nav-link binary">
-                                            <i class="fas fa-sitemap nav-icon"></i>
-                                            <p>My Tree</p>
-                                        </a>
-                                    @else
-                                        <a href="{{ route('sunflower') }}" class="nav-link binary">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>My Team</p>
-                                        </a>
-                                    @endif
+                                    <a href="{{ route('user.binary_tree') }}" class="nav-link binary">
+                                        <i class="fas fa-sitemap nav-icon"></i>
+                                        <p>My Tree @if(!$migrationDone)<span class="badge badge-warning badge-sm ml-1">Migration</span>@endif</p>
+                                    </a>
                                 </li>
+                                @if(!$migrationDone)
+                                <li class="nav-item">
+                                    <a href="{{ route('sunflower') }}" class="nav-link">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>My Team (Sunflower)</p>
+                                    </a>
+                                </li>
+                                @endif
                                 @if(auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin')
                                 <li class="nav-item">
                                     <a href="{{ route('admin.binary_tree') }}" class="nav-link">
@@ -266,12 +267,14 @@
                                     </a>
                                 </li>
                                 @endif
+                                @if($migrationDone || auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin')
                                 <li class="nav-item">
                                     <a href="{{ route('binary_income_details') }}" class="nav-link">
                                         <i class="fas fa-money-bill-wave nav-icon text-primary"></i>
                                         <p>My Binary Income</p>
                                     </a>
                                 </li>
+                                @endif
                                 <li class="nav-item has-treeview rank_details">
                                     <a href="{{ route('rank_details') }}" class="nav-link rank_details">
                                         <i class="nav-icon fas fa-medal">‌</i>

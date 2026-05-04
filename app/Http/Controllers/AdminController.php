@@ -382,6 +382,10 @@ class AdminController extends Controller
 
     public function binaryIncomeUser()
     {
+        if (!\App\Models\BinaryTreeSetting::current()->migration_complete) {
+            abort(403, 'Binary income is not available yet. Please check back after migration is complete.');
+        }
+
         $userId    = auth()->id();
         $yesterday = \Carbon\Carbon::yesterday()->toDateString();
 
@@ -1177,6 +1181,12 @@ class AdminController extends Controller
             $parent_id    = $binaryParent ? $binaryParent->id : 996;
             $position     = in_array($request->position, ['left', 'right']) ? $request->position : 'left';
             $level        = ($binaryParent->level ?? 0) + 1;
+
+            // Placement must be within the sponsor's binary subtree
+            $conflict = $this->checkSponsorSubtreeConflict($currenrsponsor, $parent_id);
+            if ($conflict) {
+                return json_encode(['status' => 'error', 'message' => $conflict]);
+            }
         } else {
             $parent_id = 996;
             $position  = 'left';
@@ -6377,30 +6387,28 @@ class AdminController extends Controller
 
     public function userBinaryTree(Request $request)
     {
-        $settings = BinaryTreeSetting::current();
+        $settings   = BinaryTreeSetting::current();
+        $me         = auth()->user();
+        $globalRoot = $settings->root_user_id ? User::find($settings->root_user_id) : null;
 
-        if (!$settings->migration_complete) {
-            return redirect()->route('sunflower')->with('info', 'Binary tree is not yet available.');
-        }
-
-        $me          = auth()->user();
         $nodeId      = $request->query('node_id');
         $currentNode = $nodeId ? User::find($nodeId) : $me;
 
-        // Users can only browse within their own subtree
+        // Only allow navigating within the logged-in user's own subtree
         if ($currentNode && $currentNode->id !== $me->id) {
-            // Verify currentNode is a descendant of the logged-in user
             $node = $currentNode;
             $isDescendant = false;
             while ($node && $node->parent_id) {
-                if ($node->parent_id == $me->id) { $isDescendant = true; break; }
+                if ((string)$node->parent_id === (string)$me->id) { $isDescendant = true; break; }
                 $node = User::find($node->parent_id);
-                if ($node && $node->id == $me->id) { $isDescendant = true; break; }
+                if ($node && (string)$node->id === (string)$me->id) { $isDescendant = true; break; }
             }
             if (!$isDescendant) $currentNode = $me;
         }
 
         $binaryTree = $this->buildBinaryTreeData($currentNode, 4);
+
+        // Back button only navigates within own subtree (never above $me)
         $parentNode = ($currentNode && $currentNode->id !== $me->id && $currentNode->parent_id)
             ? User::find($currentNode->parent_id)
             : null;
@@ -6408,8 +6416,75 @@ class AdminController extends Controller
         $packages = \App\Models\Package::where('status', 1)->orderBy('name')->get();
 
         return view('Admin.binary_tree_user', compact(
-            'currentNode', 'binaryTree', 'parentNode', 'packages', 'me'
+            'currentNode', 'binaryTree', 'parentNode', 'packages', 'me', 'settings', 'globalRoot'
         ));
+    }
+
+    public function userBinaryTreeSearch(Request $request)
+    {
+        $query    = $request->get('q', '');
+        $me       = auth()->user();
+        $settings = BinaryTreeSetting::current();
+        $rootId   = $settings->root_user_id;
+
+        // Only the logged-in user's recursive sponsor downlines
+        $downlineIds = $this->getAllSponsorDownlineIds($me->id);
+
+        if (empty($downlineIds)) {
+            return response()->json([]);
+        }
+
+        // Exclude users already placed in the new binary tree (root + its descendants via parent_id)
+        $binaryUserIds = $rootId ? $this->getAllBinaryTreeIds((int) $rootId) : [];
+
+        $users = User::select('id', 'name', 'connection', 'user_image')
+            ->where('role', 'user')
+            ->whereIn('id', $downlineIds)
+            ->when(!empty($binaryUserIds), fn($q) => $q->whereNotIn('id', $binaryUserIds))
+            ->where(function ($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('connection', 'like', "%{$query}%");
+            })
+            ->limit(20)
+            ->get()
+            ->map(fn($u) => [
+                'id'         => $u->id,
+                'name'       => $u->name,
+                'connection' => $u->connection,
+                'image'      => $u->user_image ? asset($u->user_image) : asset('assets/dist/img/images.jpg'),
+            ]);
+
+        return response()->json($users);
+    }
+
+    private function getAllSponsorDownlineIds(int $sponsorId): array
+    {
+        $ids   = [];
+        $queue = [$sponsorId];
+        while (!empty($queue)) {
+            $current  = array_shift($queue);
+            $children = User::where('sponsor_id', $current)->pluck('id')->toArray();
+            foreach ($children as $childId) {
+                $ids[]   = $childId;
+                $queue[] = $childId;
+            }
+        }
+        return $ids;
+    }
+
+    private function getAllBinaryTreeIds(int $rootId): array
+    {
+        $ids   = [$rootId];
+        $queue = [$rootId];
+        while (!empty($queue)) {
+            $current  = array_shift($queue);
+            $children = User::where('parent_id', $current)->pluck('id')->toArray();
+            foreach ($children as $childId) {
+                $ids[]   = $childId;
+                $queue[] = $childId;
+            }
+        }
+        return $ids;
     }
 
     // ── Binary Tree Admin Migration ──────────────────────────────────────────────
@@ -6499,6 +6574,13 @@ class AdminController extends Controller
         if ($user->pan_card_no && $user->mother_id != 1) {
             $conflict = $this->checkMotherSubtreeConflict($user, $request->parent_id);
             if ($conflict) return response()->json(['status' => 'error', 'message' => $conflict]);
+        }
+
+        // Sponsor subtree check: placement must be within the user's sponsor's binary subtree
+        $caller = auth()->user();
+        if ($caller && !in_array($caller->role, ['admin', 'superadmin'])) {
+            $sponsorConflict = $this->checkSponsorSubtreeConflict((int) $user->sponsor_id, $request->parent_id);
+            if ($sponsorConflict) return response()->json(['status' => 'error', 'message' => $sponsorConflict]);
         }
 
         // Remove from old position if already placed
@@ -6686,6 +6768,37 @@ class AdminController extends Controller
                 default => 'Child ID',
             };
             return "{$user->name} ({$user->connection}) is a {$accountType} — must stay within Mother ID {$motherUser->connection}'s tree. Moving outside is not allowed.";
+        }
+
+        return null;
+    }
+
+    /**
+     * Check that $targetParentId is within the binary subtree rooted at $sponsorId.
+     * Returns null if OK, or an error message string if the slot is outside the sponsor's tree.
+     */
+    private function checkSponsorSubtreeConflict(int $sponsorId, int $targetParentId): ?string
+    {
+        $sponsor = User::find($sponsorId);
+        if (!$sponsor) return null;
+
+        // If the sponsor has no binary position yet, skip the check
+        if (!$sponsor->parent_id && BinaryTreeSetting::current()->root_user_id != $sponsorId) {
+            return null;
+        }
+
+        $inSubtree = DB::select("
+            WITH RECURSIVE subtree AS (
+                SELECT id FROM users WHERE id = ?
+                UNION ALL
+                SELECT u.id FROM users u
+                INNER JOIN subtree s ON u.parent_id = s.id
+            )
+            SELECT COUNT(*) as cnt FROM subtree WHERE id = ?
+        ", [$sponsorId, $targetParentId]);
+
+        if (($inSubtree[0]->cnt ?? 0) == 0) {
+            return "The selected slot is outside {$sponsor->name} ({$sponsor->connection})'s binary subtree. You can only place this member within their sponsor's tree.";
         }
 
         return null;

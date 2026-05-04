@@ -65,8 +65,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/pin_request_details', [AdminController::class, 'pin_request_details'])->name('pin_request_details');
     Route::get('/binary_income_details', [AdminController::class, 'binary_income_details'])->name('binary_income_details');
 
-    // User binary tree (post-migration)
+    // User binary tree
     Route::get('/my-tree', [AdminController::class, 'userBinaryTree'])->name('user.binary_tree');
+    Route::get('/my-tree/search-users', [AdminController::class, 'userBinaryTreeSearch'])->name('user.binary_tree.search_users');
 
     // Binary Tree Admin Migration
     Route::get('/admin/binary-tree', [AdminController::class, 'binaryTreeAdmin'])->name('admin.binary_tree');
