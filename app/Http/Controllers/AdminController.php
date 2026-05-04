@@ -3287,25 +3287,91 @@ class AdminController extends Controller
         return response()->json(['status' => 'error', 'message' => 'User not found']);
     }
 
+    public function checkMotherIdChange(Request $request)
+    {
+        $user = User::findOrFail($request->user_id);
+
+        if ($user->mother_id != 1) {
+            return response()->json(['case' => 'not_mother']);
+        }
+
+        $newName = trim($request->new_name);
+        $newPan  = strtoupper(trim($request->new_pan ?? ''));
+        $nameChanged = strtolower($newName) !== strtolower(trim($user->name));
+        $panChanged  = $newPan !== strtoupper(trim($user->pan_card_no ?? ''));
+
+        if (!$nameChanged && !$panChanged) {
+            return response()->json(['case' => 'no_change']);
+        }
+
+        $existing = User::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($newName)])
+            ->where('pan_card_no', $newPan)
+            ->where('id', '!=', $user->id)
+            ->first();
+
+        if ($existing) {
+            if ($existing->mother_id == 1) {
+                return response()->json([
+                    'case'    => 1,
+                    'message' => "Another Mother ID ({$existing->connection} — {$existing->name}) already exists with this name and PAN card.",
+                ]);
+            }
+
+            // Case 2 sub-conditions
+            if (User::where('parent_id', $existing->id)->exists()) {
+                return response()->json([
+                    'case'    => 'blocked',
+                    'message' => "{$existing->connection} ({$existing->name}) has binary tree children and cannot be placed under a new Mother ID.",
+                ]);
+            }
+            if (!$existing->parent_id || $existing->parent_id == 996) {
+                return response()->json([
+                    'case'    => 'blocked',
+                    'message' => "{$existing->connection} ({$existing->name}) is not placed in the binary tree yet.",
+                ]);
+            }
+
+            $oldPanChildren = User::where('pan_card_no', $user->pan_card_no)
+                ->where('id', '!=', $user->id)
+                ->get(['id', 'connection', 'name']);
+
+            return response()->json([
+                'case'           => 2,
+                'existing_child' => ['id' => $existing->id, 'connection' => $existing->connection, 'name' => $existing->name],
+                'old_pan_children' => $oldPanChildren,
+            ]);
+        }
+
+        // Case 3 — fresh name+PAN combination
+        $oldPanChildren = User::where('pan_card_no', $user->pan_card_no)
+            ->where('id', '!=', $user->id)
+            ->get(['id', 'connection', 'name']);
+
+        return response()->json([
+            'case'             => 3,
+            'old_pan_children' => $oldPanChildren,
+        ]);
+    }
+
     public function update(Request $request)
     {
         $validator = Validator::make(
             $request->all(),
             [
-                'id' => 'required|exists:users,id',
-                'name' => 'required|string|max:255|regex:/^[a-zA-Z\s]+$/',
+                'id'          => 'required|exists:users,id',
+                'name'        => 'required|string|max:255|regex:/^[a-zA-Z\s]+$/',
                 'pan_card_no' => 'nullable|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/',
-                'email' => 'required|email',
-                'phone_no' => 'required|regex:/^[0-9]{10}$/',
-                'pincode' => 'required|regex:/^[1-9][0-9]{5}$/',
-                'address' => 'required|string',
+                'email'       => 'required|email',
+                'phone_no'    => 'required|regex:/^[0-9]{10}$/',
+                'pincode'     => 'required|regex:/^[1-9][0-9]{5}$/',
+                'address'     => 'required|string',
             ],
             [
-                'name.required' => 'Name is required.',
-                'name.regex' => 'Name must only contain letters and spaces.',
-                'phone_no.regex' => 'Phone number must be exactly 10 digits.',
+                'name.required'     => 'Name is required.',
+                'name.regex'        => 'Name must only contain letters and spaces.',
+                'phone_no.regex'    => 'Phone number must be exactly 10 digits.',
                 'pan_card_no.regex' => 'PAN card number must follow the format: 5 letters, 4 digits, 1 letter.',
-                'pincode.regex' => 'Pincode must be 6 digits and cannot start with 0.',
+                'pincode.regex'     => 'Pincode must be 6 digits and cannot start with 0.',
             ]
         );
 
@@ -3314,9 +3380,19 @@ class AdminController extends Controller
         }
 
         $user = User::findOrFail($request->id);
+
+        // If Mother ID and a new Mother ID picker was confirmed, promote that user
+        if ($user->mother_id == 1 && $request->filled('new_mother_id')) {
+            $newMother = User::find((int) $request->new_mother_id);
+            if ($newMother) {
+                $newMother->mother_id = 1;
+                $newMother->save();
+            }
+        }
+
         $user->update($request->only(['name', 'pan_card_no', 'email', 'phone_no', 'pincode', 'address']));
 
-        return json_encode(['status' => 'success', 'message' => 'user added successfully']);
+        return json_encode(['status' => 'success', 'message' => 'User updated successfully']);
     }
 
     public function companyRank_income()

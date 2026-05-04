@@ -166,6 +166,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/userlist', [AdminController::class, 'userlist'])->name('userlist');
     Route::post('/user/update', [AdminController::class, 'update'])->name('userUpdate');
     Route::get('/user/details/{id}', [AdminController::class, 'getUserDetails'])->name('getUserDetails');
+    Route::get('/admin/user/check-mother-id-change', [AdminController::class, 'checkMotherIdChange'])->name('admin.user.check_mother_id_change');
     Route::get('companyRank_income', [AdminController::class, 'companyRank_income'])->name('companyRank_income');
 
 
