@@ -6163,6 +6163,12 @@ class AdminController extends Controller
             $parent_id    = $binaryParent ? $binaryParent->id : 996;
             $position     = in_array($request->position, ['left', 'right']) ? $request->position : 'left';
             $level        = ($binaryParent->level ?? 0) + 1;
+
+            // Placement must be within the sponsor's binary subtree
+            $conflict = $this->checkSponsorSubtreeConflict($currenrsponsor, $parent_id);
+            if ($conflict) {
+                return response()->json(['status' => 'error', 'message' => $conflict]);
+            }
         } else {
             $parent_id = 996;
             $position  = 'left';
