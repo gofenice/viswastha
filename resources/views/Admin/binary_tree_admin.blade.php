@@ -478,7 +478,8 @@
                                 </div>
                                 <div class="form-group col-md-6">
                                     <label>Sponsor ID <span class="text-danger">*</span></label>
-                                    <input type="text" name="sponsor_id" class="form-control" placeholder="Sponsor connection code" required>
+                                    <input type="text" name="sponsor_id" id="sponsorIdInput" class="form-control" placeholder="Sponsor connection code" required autocomplete="off">
+                                    <small id="sponsorNamePreview" class="mt-1 d-block" style="min-height:18px;"></small>
                                 </div>
                                 <div class="form-group col-md-6">
                                     <label>Password <span class="text-danger">*</span></label>
@@ -1502,6 +1503,26 @@ function showLegDetail(e, userId, side, packageCode) {
         $('#legDetailBody').html('<p class="text-danger text-center">Failed to load data.</p>');
     });
 }
+
+// Sponsor ID live name preview
+(function () {
+    var timer;
+    $(document).on('input', '#sponsorIdInput', function () {
+        var val = $.trim($(this).val()).toUpperCase();
+        var $preview = $('#sponsorNamePreview');
+        clearTimeout(timer);
+        if (!val) { $preview.text(''); return; }
+        timer = setTimeout(function () {
+            $.post('{{ route("get_user_name") }}', { userId: val, _token: '{{ csrf_token() }}' })
+                .done(function (res) {
+                    $preview.html('<span class="text-success"><i class="fas fa-check-circle mr-1"></i>' + res.name + '</span>');
+                })
+                .fail(function () {
+                    $preview.html('<span class="text-danger"><i class="fas fa-times-circle mr-1"></i>User not found</span>');
+                });
+        }, 400);
+    });
+})();
 </script>
 
 {{-- Leg Volume Detail Modal --}}
