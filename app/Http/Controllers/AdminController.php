@@ -6437,7 +6437,7 @@ class AdminController extends Controller
         $downlineIds = $this->getAllSponsorDownlineIds($me->id);
 
         if (empty($downlineIds)) {
-            return response()->json([]);
+            return response()->json(['_debug' => 'empty_downlines', 'user_id' => $me->id, 'connection' => $me->connection]);
         }
 
         // Exclude users already placed in the new binary tree (root + its descendants via parent_id)
