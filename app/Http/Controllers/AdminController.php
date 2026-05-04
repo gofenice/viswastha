@@ -6577,8 +6577,7 @@ class AdminController extends Controller
         }
 
         // Sponsor subtree check: placement must be within the user's sponsor's binary subtree
-        $caller = auth()->user();
-        if ($caller && !in_array($caller->role, ['admin', 'superadmin'])) {
+        if ($user->sponsor_id) {
             $sponsorConflict = $this->checkSponsorSubtreeConflict((int) $user->sponsor_id, $request->parent_id);
             if ($sponsorConflict) return response()->json(['status' => 'error', 'message' => $sponsorConflict]);
         }
