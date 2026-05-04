@@ -6437,16 +6437,16 @@ class AdminController extends Controller
         $downlineIds = $this->getAllSponsorDownlineIds($me->id);
 
         if (empty($downlineIds)) {
-            return response()->json(['_debug' => 'empty_downlines', 'user_id' => $me->id, 'connection' => $me->connection]);
+            return response()->json([]);
         }
 
-        // Exclude users already placed in the new binary tree (root + its descendants via parent_id)
-        $binaryUserIds = $rootId ? $this->getAllBinaryTreeIds((int) $rootId) : [];
-
+        // Exclude users already given a real binary placement (parent_id set and not the sunflower fallback 996)
         $users = User::select('id', 'name', 'connection', 'user_image')
             ->where('role', 'user')
             ->whereIn('id', $downlineIds)
-            ->when(!empty($binaryUserIds), fn($q) => $q->whereNotIn('id', $binaryUserIds))
+            ->where(function ($q) {
+                $q->whereNull('parent_id')->orWhere('parent_id', 996);
+            })
             ->where(function ($q) use ($query) {
                 $q->where('name', 'like', "%{$query}%")
                   ->orWhere('connection', 'like', "%{$query}%");
@@ -6459,18 +6459,6 @@ class AdminController extends Controller
                 'connection' => $u->connection,
                 'image'      => $u->user_image ? asset($u->user_image) : asset('assets/dist/img/images.jpg'),
             ]);
-
-        if ($users->isEmpty()) {
-            return response()->json([
-                '_debug'          => 'query_empty',
-                'user_id'         => $me->id,
-                'connection'      => $me->connection,
-                'downlines_count' => count($downlineIds),
-                'binary_count'    => count($binaryUserIds),
-                'root_id'         => $rootId,
-                'sample_downline' => array_slice($downlineIds, 0, 5),
-            ]);
-        }
 
         return response()->json($users);
     }
