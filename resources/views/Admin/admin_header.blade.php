@@ -239,6 +239,7 @@
                             </a>
                             <ul class="nav nav-treeview team">
                                 @php $migrationDone = \App\Models\BinaryTreeSetting::current()->migration_complete; @endphp
+                                @if(!in_array(auth()->user()->role, ['admin', 'superadmin']))
                                 <li class="nav-item">
                                     <a href="{{ route('user.binary_tree') }}" class="nav-link binary">
                                         <i class="fas fa-sitemap nav-icon"></i>
@@ -252,6 +253,7 @@
                                         <p>My Team (Sunflower)</p>
                                     </a>
                                 </li>
+                                @endif
                                 @endif
                                 @if(auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin')
                                 <li class="nav-item">
