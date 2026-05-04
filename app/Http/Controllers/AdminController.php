@@ -6460,6 +6460,18 @@ class AdminController extends Controller
                 'image'      => $u->user_image ? asset($u->user_image) : asset('assets/dist/img/images.jpg'),
             ]);
 
+        if ($users->isEmpty()) {
+            return response()->json([
+                '_debug'          => 'query_empty',
+                'user_id'         => $me->id,
+                'connection'      => $me->connection,
+                'downlines_count' => count($downlineIds),
+                'binary_count'    => count($binaryUserIds),
+                'root_id'         => $rootId,
+                'sample_downline' => array_slice($downlineIds, 0, 5),
+            ]);
+        }
+
         return response()->json($users);
     }
 
