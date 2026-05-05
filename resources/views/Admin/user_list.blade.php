@@ -200,43 +200,31 @@
                             <textarea name="address" id="address" class="form-control" required>{{ old('address') }}</textarea>
                             <span class="error-message text-danger"></span>
                         </div>
-                    </div>
                         <input type="hidden" id="_original_name" name="_original_name">
                         <input type="hidden" id="_original_pan" name="_original_pan">
                         <input type="hidden" id="_mother_id" name="_mother_id">
                         <input type="hidden" id="new_mother_id" name="new_mother_id">
+
+                        {{-- Inline Mother ID picker (shown only when needed) --}}
+                        <div id="mother-picker-section" class="col-md-12 mt-2" style="display:none;">
+                            <div class="alert alert-warning py-2">
+                                <p id="mother-picker-info" class="mb-2 small"></p>
+                                <div class="form-group mb-0">
+                                    <label class="font-weight-bold">Who becomes the new Mother ID for the old PAN group? <span class="text-danger">*</span></label>
+                                    <select id="mother-picker-select" class="form-control mt-1"></select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Update</button>
+                        <button type="submit" id="btn-update" class="btn btn-primary">Update</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    {{-- Mother ID picker modal --}}
-    <div class="modal fade" id="modal-mother-picker">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h4 class="modal-title">Select New Mother ID for Old PAN Group</h4>
-                    <button type="button" class="close" data-dismiss="modal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p id="mother-picker-info" class="text-muted mb-3"></p>
-                    <div class="form-group">
-                        <label>Who becomes the new Mother ID for the old PAN group?</label>
-                        <select id="mother-picker-select" class="form-control"></select>
-                    </div>
-                </div>
-                <div class="modal-footer justify-content-between">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="mother-picker-confirm">Confirm &amp; Save</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div class="modal fade" id="modal-lg-sponsor">
         <div class="modal-dialog modal-lg">
@@ -633,6 +621,14 @@
                 }
             });
 
+            // Reset picker section when modal is closed
+            $('#modal-lg').on('hidden.bs.modal', function () {
+                $('#mother-picker-section').hide();
+                $('#mother-picker-select').empty();
+                $('#new_mother_id').val('');
+                $('#btn-update').text('Update');
+            });
+
             // AJAX form submit with Mother ID change interception
             $('#user-form').on('submit', function(e) {
                 e.preventDefault();
@@ -642,6 +638,18 @@
                 var originalPan  = ($('#_original_pan').val() || '').trim().toUpperCase();
                 var newName      = $('#name').val().trim().toLowerCase();
                 var newPan       = $('#pan_card_no').val().trim().toUpperCase();
+                var pickerVisible = $('#mother-picker-section').is(':visible');
+
+                // If picker is visible, validate selection then save
+                if (pickerVisible) {
+                    if (!$('#mother-picker-select').val()) {
+                        Swal.fire('Required', 'Please select a new Mother ID for the old PAN group.', 'warning');
+                        return;
+                    }
+                    $('#new_mother_id').val($('#mother-picker-select').val());
+                    submitUserForm();
+                    return;
+                }
 
                 if (motherId === 1 && (newName !== originalName || newPan !== originalPan)) {
                     $.getJSON('{{ route("admin.user.check_mother_id_change") }}', {
@@ -661,8 +669,8 @@
                                 $.each(res.old_pan_children, function(i, u) {
                                     $sel.append('<option value="' + u.id + '">' + u.connection + ' — ' + u.name + '</option>');
                                 });
-                                $('#modal-lg').modal('hide');
-                                $('#modal-mother-picker').modal('show');
+                                $('#mother-picker-section').show();
+                                $('#btn-update').text('Confirm & Update');
                             } else {
                                 submitUserForm();
                             }
@@ -677,34 +685,28 @@
                 }
             });
 
-            $('#mother-picker-confirm').on('click', function() {
-                $('#new_mother_id').val($('#mother-picker-select').val());
-                $('#modal-mother-picker').modal('hide');
-                submitUserForm();
-            });
-
             function submitUserForm() {
-                $('#user-form button[type="submit"]').prop('disabled', true);
+                $('#btn-update').prop('disabled', true);
                 $.post('{{ route("userUpdate") }}', $('#user-form').serialize(), function(responseText) {
                     var data = typeof responseText === 'string' ? JSON.parse(responseText) : responseText;
-                    $('#user-form button[type="submit"]').prop('disabled', false);
+                    $('#btn-update').prop('disabled', false);
                     $('.error-message').text('');
 
                     if (data.status === 'validation') {
                         $.each(data.errors, function(key, val) {
                             $('[name="' + key + '"]').closest('.form-group').find('.error-message').text(val);
                         });
-                        $('#modal-lg').modal('show');
                     } else if (data.status === 'success') {
                         $('#user-form')[0].reset();
                         Swal.fire({ icon: 'success', title: 'Success', text: data.message, timer: 1500, showConfirmButton: false })
                             .then(() => window.location.reload());
                     } else if (data.status === 'error') {
                         Swal.fire('Error', data.message, 'error');
-                        $('#modal-lg').modal('show');
+                        $('#mother-picker-section').hide();
+                        $('#btn-update').text('Update');
                     }
                 }).fail(function() {
-                    $('#user-form button[type="submit"]').prop('disabled', false);
+                    $('#btn-update').prop('disabled', false);
                     Swal.fire('Error', 'Submission failed. Please try again.', 'error');
                 });
             }
