@@ -3389,18 +3389,42 @@ class AdminController extends Controller
 
         $user = User::findOrFail($request->id);
 
-        // Block if the new PAN already belongs to another user with a different name
-        $newPan  = strtoupper(trim($request->pan_card_no ?? ''));
-        $newName = trim($request->name ?? '');
+        // Block if the new PAN already belongs to another user with a different name.
+        // If same name → same person joining an existing PAN group: auto-assign the next available role.
+        $newPan        = strtoupper(trim($request->pan_card_no ?? ''));
+        $newName       = trim($request->name ?? '');
+        $currentPan    = strtoupper(trim($user->pan_card_no ?? ''));
+        $joiningGroup  = !empty($newPan) && $newPan !== 'STORE'
+                         && ($currentPan !== $newPan || empty($currentPan) || $currentPan === 'STORE');
+
         if (!empty($newPan) && $newPan !== 'STORE') {
             $panOwner = User::where('pan_card_no', $newPan)
                 ->where('id', '!=', $user->id)
                 ->first();
+
             if ($panOwner && strtolower(trim($panOwner->name)) !== strtolower($newName)) {
+                // Different person — block
                 return json_encode([
                     'status'  => 'error',
                     'message' => "PAN card {$newPan} is already registered to {$panOwner->name} ({$panOwner->connection}). If this is the same person, make sure the name matches exactly.",
                 ]);
+            }
+
+            if ($panOwner && $joiningGroup && strtolower(trim($panOwner->name)) === strtolower($newName)) {
+                // Same person joining an existing PAN group — assign the next available role
+                $existingRoles = User::where('pan_card_no', $newPan)
+                    ->where('id', '!=', $user->id)
+                    ->pluck('mother_id')
+                    ->toArray();
+
+                if (!in_array(2, $existingRoles)) {
+                    $user->mother_id = 2; // Privilege 1
+                } elseif (!in_array(3, $existingRoles)) {
+                    $user->mother_id = 3; // Privilege 2
+                } else {
+                    $user->mother_id = 0; // Child ID
+                }
+                $user->save();
             }
         }
 
