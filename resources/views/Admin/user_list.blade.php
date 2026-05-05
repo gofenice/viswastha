@@ -675,6 +675,16 @@
                                     $sel.append('<option value="' + nearest.id + '">' + label + '</option>');
                                 }
 
+                                // Reference table — all PAN group members for info only
+                                if (res.old_pan_children.length > 0) {
+                                    var refHtml = '<div class="mt-2"><small class="text-muted font-weight-bold">All accounts under this PAN:</small><table class="table table-sm table-bordered mt-1 mb-0" style="font-size:12px;"><thead><tr><th>ID</th><th>Name</th><th>Type</th></tr></thead><tbody>';
+                                    $.each(res.old_pan_children, function(i, u) {
+                                        refHtml += '<tr><td>' + u.connection + '</td><td>' + u.name + '</td><td>' + acctLabel(u.mother_id) + '</td></tr>';
+                                    });
+                                    refHtml += '</tbody></table></div>';
+                                    $('#mother-picker-info').append(refHtml);
+                                }
+
                                 $('#mother-picker-section').show();
                                 $('#btn-update').text('Confirm & Update');
                             } else {
