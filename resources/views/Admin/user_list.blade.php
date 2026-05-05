@@ -624,9 +624,10 @@
             // Reset picker section when modal is closed
             $('#modal-lg').on('hidden.bs.modal', function () {
                 $('#mother-picker-section').hide();
+                $('#mother-picker-select').closest('.form-group').show();
                 $('#mother-picker-select').empty();
                 $('#new_mother_id').val('');
-                $('#btn-update').text('Update');
+                $('#btn-update').prop('disabled', false).text('Update');
             });
 
             // AJAX form submit with Mother ID change interception
@@ -670,6 +671,8 @@
                                 var $sel = $('#mother-picker-select').empty();
                                 function acctLabel(m) { return m == 2 ? 'Privilege 1' : m == 3 ? 'Privilege 2' : m == 1 ? 'Mother ID' : 'Child ID'; }
                                 var nearest = res.old_pan_children[0];
+                                var nearestIsPrivilege = nearest && (nearest.mother_id == 2 || nearest.mother_id == 3);
+
                                 if (nearest) {
                                     var label = nearest.connection + ' — ' + nearest.name + ' (' + acctLabel(nearest.mother_id) + ')';
                                     $sel.append('<option value="' + nearest.id + '">' + label + '</option>');
@@ -685,8 +688,23 @@
                                     $('#mother-picker-info').append(refHtml);
                                 }
 
+                                if (nearestIsPrivilege) {
+                                    // Block submit — nearest ID must be a Child ID first
+                                    var privType = acctLabel(nearest.mother_id);
+                                    $('#mother-picker-info').prepend(
+                                        '<div class="alert alert-danger py-2 mb-2" style="font-size:13px;">' +
+                                        '<strong>Cannot proceed:</strong> <strong>' + nearest.connection + '</strong> is a <strong>' + privType + '</strong>. ' +
+                                        'Please reassign the ' + privType + ' to another member first, then retry this update.' +
+                                        '</div>'
+                                    );
+                                    $sel.closest('.form-group').hide();
+                                    $sel.closest('.form-group').prev('label').hide();
+                                    $('#btn-update').prop('disabled', true).text('Confirm & Update');
+                                } else {
+                                    $('#btn-update').prop('disabled', false).text('Confirm & Update');
+                                }
+
                                 $('#mother-picker-section').show();
-                                $('#btn-update').text('Confirm & Update');
                             } else {
                                 submitUserForm();
                             }
