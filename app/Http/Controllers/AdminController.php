@@ -3317,9 +3317,26 @@ class AdminController extends Controller
 
         if ($existing) {
             if ($existing->mother_id == 1) {
+                // Another Mother ID exists with this name+PAN.
+                // If the current user is a standalone Mother ID (no other accounts under its old PAN),
+                // allow it to join the target group — update() will auto-assign the correct role (Child ID).
+                $oldGroupCount = User::where('pan_card_no', $currentPan)
+                    ->where('id', '!=', $user->id)
+                    ->count();
+
+                if ($oldGroupCount === 0) {
+                    return response()->json(['case' => 'no_change']);
+                }
+
+                // Has other accounts under old PAN — need to pick a new Mother ID first
+                $oldPanChildren = User::where('pan_card_no', $currentPan)
+                    ->where('id', '!=', $user->id)
+                    ->orderBy('id', 'asc')
+                    ->get(['id', 'connection', 'name', 'mother_id']);
+
                 return response()->json([
-                    'case'    => 1,
-                    'message' => "Another Mother ID ({$existing->connection} — {$existing->name}) already exists with this name and PAN card.",
+                    'case'             => 3,
+                    'old_pan_children' => $oldPanChildren,
                 ]);
             }
 
