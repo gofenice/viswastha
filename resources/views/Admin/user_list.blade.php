@@ -666,23 +666,13 @@
                                     : 'This is a fresh name &amp; PAN combination. Select who takes over as Mother ID for the old PAN group:';
                                 $('#mother-picker-info').html(info);
 
-                                // Build dropdown — all members, sorted by ID (nearest first, auto-selected)
+                                // Show only the nearest (lowest ID) member as the single auto-selected option
                                 var $sel = $('#mother-picker-select').empty();
-                                function acctLabel(m) { return m === 2 ? 'Privilege 1' : m === 3 ? 'Privilege 2' : m === 1 ? 'Mother ID' : 'Child ID'; }
-                                $.each(res.old_pan_children, function(i, u) {
-                                    var label = u.connection + ' — ' + u.name + ' (' + acctLabel(u.mother_id) + ')';
-                                    $sel.append('<option value="' + u.id + '">' + label + '</option>');
-                                });
-                                // First option is auto-selected (lowest ID = nearest)
-
-                                // Reference table of all members
-                                if (res.old_pan_children.length > 1) {
-                                    var refHtml = '<div class="mt-2"><small class="text-muted font-weight-bold">All accounts under this PAN (for reference):</small><table class="table table-sm table-bordered mt-1 mb-0" style="font-size:12px;"><thead><tr><th>ID</th><th>Name</th><th>Type</th></tr></thead><tbody>';
-                                    $.each(res.old_pan_children, function(i, u) {
-                                        refHtml += '<tr><td>' + u.connection + '</td><td>' + u.name + '</td><td>' + acctLabel(u.mother_id) + '</td></tr>';
-                                    });
-                                    refHtml += '</tbody></table></div>';
-                                    $('#mother-picker-info').append(refHtml);
+                                function acctLabel(m) { return m == 2 ? 'Privilege 1' : m == 3 ? 'Privilege 2' : m == 1 ? 'Mother ID' : 'Child ID'; }
+                                var nearest = res.old_pan_children[0];
+                                if (nearest) {
+                                    var label = nearest.connection + ' — ' + nearest.name + ' (' + acctLabel(nearest.mother_id) + ')';
+                                    $sel.append('<option value="' + nearest.id + '">' + label + '</option>');
                                 }
 
                                 $('#mother-picker-section').show();
