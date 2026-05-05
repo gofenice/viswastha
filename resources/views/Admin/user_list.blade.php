@@ -666,9 +666,18 @@
                                     : 'This is a fresh name &amp; PAN combination. Select who takes over as Mother ID for the old PAN group:';
                                 $('#mother-picker-info').html(info);
                                 var $sel = $('#mother-picker-select').empty();
+                                var hasPrivilege = res.old_pan_children.some(function(u) { return u.mother_id === 2 || u.mother_id === 3; });
                                 $.each(res.old_pan_children, function(i, u) {
-                                    $sel.append('<option value="' + u.id + '">' + u.connection + ' — ' + u.name + '</option>');
+                                    var isPriv = u.mother_id === 2 || u.mother_id === 3;
+                                    if (hasPrivilege && !isPriv) return; // skip child IDs if privilege exists
+                                    var label = u.connection + ' — ' + u.name;
+                                    if (u.mother_id === 2) label += ' (Privilege 1)';
+                                    if (u.mother_id === 3) label += ' (Privilege 2)';
+                                    $sel.append('<option value="' + u.id + '">' + label + '</option>');
                                 });
+                                if (hasPrivilege) {
+                                    $('#mother-picker-info').html(info + '<br><small class="text-danger mt-1 d-block">Only Privilege accounts can be promoted — Child IDs cannot become Mother ID while a Privilege ID exists.</small>');
+                                }
                                 $('#mother-picker-section').show();
                                 $('#btn-update').text('Confirm & Update');
                             } else {

@@ -3333,7 +3333,8 @@ class AdminController extends Controller
 
             $oldPanChildren = User::where('pan_card_no', $user->pan_card_no)
                 ->where('id', '!=', $user->id)
-                ->get(['id', 'connection', 'name']);
+                ->orderByRaw('CASE WHEN mother_id IN (2,3) THEN 0 ELSE 1 END')
+                ->get(['id', 'connection', 'name', 'mother_id']);
 
             return response()->json([
                 'case'           => 2,
@@ -3345,7 +3346,8 @@ class AdminController extends Controller
         // Case 3 — fresh name+PAN combination
         $oldPanChildren = User::where('pan_card_no', $user->pan_card_no)
             ->where('id', '!=', $user->id)
-            ->get(['id', 'connection', 'name']);
+            ->orderByRaw('CASE WHEN mother_id IN (2,3) THEN 0 ELSE 1 END')
+            ->get(['id', 'connection', 'name', 'mother_id']);
 
         return response()->json([
             'case'             => 3,
