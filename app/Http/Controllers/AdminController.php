@@ -3304,6 +3304,11 @@ class AdminController extends Controller
             return response()->json(['case' => 'no_change']);
         }
 
+        // No PAN on record — no PAN group exists, skip group logic
+        if (empty(trim($user->pan_card_no ?? ''))) {
+            return response()->json(['case' => 'no_change']);
+        }
+
         $existing = User::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($newName)])
             ->where('pan_card_no', $newPan)
             ->where('id', '!=', $user->id)
