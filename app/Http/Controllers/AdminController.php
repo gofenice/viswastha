@@ -3389,6 +3389,20 @@ class AdminController extends Controller
 
         $user = User::findOrFail($request->id);
 
+        // Block if the new PAN already belongs to another user
+        $newPan = strtoupper(trim($request->pan_card_no ?? ''));
+        if (!empty($newPan) && $newPan !== 'STORE') {
+            $panOwner = User::where('pan_card_no', $newPan)
+                ->where('id', '!=', $user->id)
+                ->first();
+            if ($panOwner) {
+                return json_encode([
+                    'status'  => 'error',
+                    'message' => "PAN card {$newPan} is already registered to {$panOwner->name} ({$panOwner->connection}).",
+                ]);
+            }
+        }
+
         // If Mother ID and a new Mother ID picker was confirmed, promote that user
         if ($user->mother_id == 1 && $request->filled('new_mother_id')) {
             $newMother = User::find((int) $request->new_mother_id);
