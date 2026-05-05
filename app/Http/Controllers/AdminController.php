@@ -3389,16 +3389,17 @@ class AdminController extends Controller
 
         $user = User::findOrFail($request->id);
 
-        // Block if the new PAN already belongs to another user
-        $newPan = strtoupper(trim($request->pan_card_no ?? ''));
+        // Block if the new PAN already belongs to another user with a different name
+        $newPan  = strtoupper(trim($request->pan_card_no ?? ''));
+        $newName = trim($request->name ?? '');
         if (!empty($newPan) && $newPan !== 'STORE') {
             $panOwner = User::where('pan_card_no', $newPan)
                 ->where('id', '!=', $user->id)
                 ->first();
-            if ($panOwner) {
+            if ($panOwner && strtolower(trim($panOwner->name)) !== strtolower($newName)) {
                 return json_encode([
                     'status'  => 'error',
-                    'message' => "PAN card {$newPan} is already registered to {$panOwner->name} ({$panOwner->connection}).",
+                    'message' => "PAN card {$newPan} is already registered to {$panOwner->name} ({$panOwner->connection}). If this is the same person, make sure the name matches exactly.",
                 ]);
             }
         }
