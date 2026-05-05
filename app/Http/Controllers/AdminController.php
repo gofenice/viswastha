@@ -3304,8 +3304,9 @@ class AdminController extends Controller
             return response()->json(['case' => 'no_change']);
         }
 
-        // No PAN on record — no PAN group exists, skip group logic
-        if (empty(trim($user->pan_card_no ?? ''))) {
+        // No PAN on record (null, empty, or placeholder 'STORE') — no PAN group exists
+        $currentPan = strtoupper(trim($user->pan_card_no ?? ''));
+        if (empty($currentPan) || $currentPan === 'STORE') {
             return response()->json(['case' => 'no_change']);
         }
 
