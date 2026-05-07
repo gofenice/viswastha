@@ -45,6 +45,8 @@ class User extends Authenticatable
         'mother_id',
         'rank_status',
         'assigned_board_member_id',
+        'fill_preference',
+        'registration_source',
     ];
 
     /**

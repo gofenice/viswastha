@@ -1,90 +1,320 @@
 @extends('Admin.admin_header')
-@section('title', 'VISHWASTHA  | Board Members')
+@section('title', 'VISHWASTHA | Board Members')
 @section('content')
- <div class="content-wrapper">
-        <section class="content-header">
-            <div class="container-fluid">
-                <div class="row mb-2">
-                    <div class="col-sm-6">
-                        <h1>Board Members </h1>
-                    </div>
-                    <div class="col-sm-6">
-                        <ol class="breadcrumb float-sm-right">
-                            <li class="breadcrumb-item"><a href="#">Home</a></li>
-                            <li class="breadcrumb-item active">Board Members </li>
-                        </ol>
-                    </div>
-                </div>
-            </div><!-- /.container-fluid -->
-        </section>
-<section class="content">
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Add Board Member Form -->
-            <div class="col-md-4">
-                <div class="card card-primary">
-                    <div class="card-header">
-                        <h3 class="card-title">Add Board Member</h3>
-                    </div>
-                    <form action="{{ route('store_board_member') }}" method="POST">
-                        @csrf
-                        <div class="card-body">
-                            <div class="form-group">
-                                <label for="user_id">User ID (Connection ID)</label>
-                                <input type="text" name="connection" class="form-control" id="connection" placeholder="Enter User Connection ID" required>
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            <button type="submit" class="btn btn-primary">Add Member</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
 
-            <!-- List Board Members -->
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Current Board Members</h3>
-                    </div>
-                    <div class="card-body p-0">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th style="width: 10px">#</th>
-                                    <th>User Name</th>
-                                    <th>Connection ID</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($boardMembers as $member)
-                                    <tr>
-                                        <td>{{ $loop->iteration }}</td>
-                                        <td>{{ $member->user->name ?? 'N/A' }}</td>
-                                        <td>{{ $member->user->connection ?? 'N/A' }}</td>
-                                        <td>
-                                            @if($member->status)
-                                                <span class="badge badge-success">Active</span>
-                                            @else
-                                                <span class="badge badge-danger">Inactive</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <a href="{{ route('delete_board_member', $member->id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?')">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+<style>
+    .queue-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 20px;
+        letter-spacing: 0.3px;
+    }
+    .stat-box {
+        text-align: center;
+        padding: 8px 4px;
+    }
+    .stat-box .stat-num {
+        font-size: 22px;
+        font-weight: 700;
+        color: #343a40;
+        line-height: 1;
+    }
+    .stat-box .stat-label {
+        font-size: 11px;
+        color: #6c757d;
+        margin-top: 2px;
+    }
+    .fill-pref-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 10px;
+        border-radius: 20px;
+    }
+    .fill-pref-left  { background: #e3f2fd; color: #1565c0; }
+    .fill-pref-right { background: #fce4ec; color: #b71c1c; }
+    .last-assigned-text {
+        font-size: 12px;
+        color: #495057;
+        line-height: 1.3;
+    }
+    .last-assigned-text small {
+        color: #adb5bd;
+        font-size: 11px;
+    }
+    .recent-assignment-row td { vertical-align: middle; font-size: 13px; }
+    .section-title {
+        font-weight: 700;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #495057;
+        margin-bottom: 10px;
+    }
+    .card-header .card-title { font-weight: 700; }
+    .total-stat-bar {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .total-stat-bar .item { text-align: center; }
+    .total-stat-bar .item .num { font-size: 20px; font-weight: 700; color: #343a40; }
+    .total-stat-bar .item .lbl { font-size: 11px; color: #6c757d; }
+</style>
+
+<div class="content-wrapper">
+    <section class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1>Board Members</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="{{ route('adminhome') }}">Home</a></li>
+                        <li class="breadcrumb-item active">Board Members</li>
+                    </ol>
                 </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
+
+    <section class="content">
+        <div class="container-fluid">
+
+            @if (session('success'))
+                <div class="alert alert-success alert-dismissible fade show">
+                    {{ session('success') }}
+                    <button type="button" class="close" data-dismiss="alert">&times;</button>
+                </div>
+            @endif
+            @if (session('error'))
+                <div class="alert alert-danger alert-dismissible fade show">
+                    {{ session('error') }}
+                    <button type="button" class="close" data-dismiss="alert">&times;</button>
+                </div>
+            @endif
+
+            <div class="row">
+
+                {{-- ── Add Board Member Form ─────────────────────────────── --}}
+                <div class="col-md-4">
+                    <div class="card card-primary">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-user-plus mr-1"></i> Add Board Member</h3>
+                        </div>
+                        <form action="{{ route('store_board_member') }}" method="POST">
+                            @csrf
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="connection">User ID (Connection ID)</label>
+                                    <input type="text" name="connection" class="form-control" id="connection"
+                                        placeholder="Enter User Connection ID"
+                                        oninput="this.value = this.value.toUpperCase()" required>
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i class="fas fa-plus mr-1"></i> Add Member
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {{-- ── Summary stats ─────────────────────────────── --}}
+                    <div class="card card-outline card-info">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-chart-bar mr-1"></i> Summary</h3>
+                        </div>
+                        <div class="card-body">
+                            @php
+                                $totalActive   = $boardMembers->where('status', 1)->count();
+                                $totalInactive = $boardMembers->where('status', 0)->count();
+                                $totalAssigned = $assignmentStats->sum('total_assigned');
+                            @endphp
+                            <div class="total-stat-bar">
+                                <div class="item">
+                                    <div class="num text-success">{{ $totalActive }}</div>
+                                    <div class="lbl">Active</div>
+                                </div>
+                                <div class="item">
+                                    <div class="num text-danger">{{ $totalInactive }}</div>
+                                    <div class="lbl">Inactive</div>
+                                </div>
+                                <div class="item">
+                                    <div class="num text-primary">{{ $totalAssigned }}</div>
+                                    <div class="lbl">Total Assigned</div>
+                                </div>
+                            </div>
+                            <p class="text-muted mb-0" style="font-size:12px;">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                New free registrations without a sponsor are assigned round-robin to active board members.
+                                The <span class="queue-badge" style="font-size:10px;padding:1px 7px;">NEXT</span> badge shows who gets the next assignment.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ── Board Members Table ───────────────────────────────── --}}
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-users mr-1"></i> Board Members &amp; Activity</h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" style="font-size:13px;">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Member</th>
+                                            <th>Fill Dir.</th>
+                                            <th>Assigned</th>
+                                            <th>Last Assigned</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($boardMembers as $member)
+                                            @php
+                                                $stats      = $assignmentStats->get($member->user_id);
+                                                $lastUser   = $lastAssignedUsers->get($member->user_id);
+                                                $isNext     = $member->status && $member->user_id === $nextBoardMemberId;
+                                                $fillPref   = $member->user->fill_preference ?? 'left';
+                                            @endphp
+                                            <tr>
+                                                <td>
+                                                    {{ $loop->iteration }}
+                                                    @if($isNext)
+                                                        <br><span class="queue-badge mt-1">NEXT</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <strong>{{ $member->user->name ?? 'N/A' }}</strong>
+                                                    <br><small class="text-muted">{{ $member->user->connection ?? '' }}</small>
+                                                </td>
+                                                <td>
+                                                    <span class="fill-pref-badge {{ $fillPref === 'left' ? 'fill-pref-left' : 'fill-pref-right' }}">
+                                                        <i class="fas fa-arrow-{{ $fillPref }}"></i>
+                                                        {{ ucfirst($fillPref) }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="stat-box">
+                                                        <div class="stat-num">{{ $stats->total_assigned ?? 0 }}</div>
+                                                        <div class="stat-label">users</div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    @if($lastUser && $stats)
+                                                        <div class="last-assigned-text">
+                                                            {{ $lastUser->last_user_name }}
+                                                            <br><small>{{ $lastUser->last_user_connection }}</small>
+                                                            <br><small>{{ \Carbon\Carbon::parse($stats->last_assigned_at)->diffForHumans() }}</small>
+                                                        </div>
+                                                    @else
+                                                        <span class="text-muted" style="font-size:12px;">No assignments yet</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if($member->status)
+                                                        <span class="badge badge-success">Active</span>
+                                                    @else
+                                                        <span class="badge badge-danger">Inactive</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <a href="{{ route('delete_board_member', $member->id) }}"
+                                                        class="btn btn-danger btn-sm"
+                                                        onclick="return confirm('Remove {{ $member->user->name ?? 'this member' }} from board members?')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="7" class="text-center text-muted py-4">
+                                                    <i class="fas fa-users-slash fa-2x mb-2 d-block"></i>
+                                                    No board members added yet.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>{{-- /row --}}
+
+            {{-- ── Recent Assignments ────────────────────────────────────── --}}
+            @if($recentAssignments->isNotEmpty())
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card card-outline card-primary">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-history mr-1"></i> Recent Free Registrations via Board Member Assignment
+                            </h3>
+                            <div class="card-tools">
+                                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>New User</th>
+                                            <th>Connection ID</th>
+                                            <th>Assigned Board Member</th>
+                                            <th>Registered At</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($recentAssignments as $i => $assignment)
+                                            <tr class="recent-assignment-row">
+                                                <td>{{ $i + 1 }}</td>
+                                                <td>{{ $assignment->name }}</td>
+                                                <td><code>{{ $assignment->connection }}</code></td>
+                                                <td>
+                                                    {{ $boardMemberNames->get($assignment->assigned_board_member_id, 'Unknown') }}
+                                                </td>
+                                                <td>
+                                                    {{ $assignment->created_at->format('d M Y, h:i A') }}
+                                                    <small class="text-muted d-block">{{ $assignment->created_at->diffForHumans() }}</small>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+        </div>
+    </section>
 </div>
+
 @endsection

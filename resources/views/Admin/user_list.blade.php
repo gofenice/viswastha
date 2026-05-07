@@ -200,15 +200,31 @@
                             <textarea name="address" id="address" class="form-control" required>{{ old('address') }}</textarea>
                             <span class="error-message text-danger"></span>
                         </div>
+                        <input type="hidden" id="_original_name" name="_original_name">
+                        <input type="hidden" id="_original_pan" name="_original_pan">
+                        <input type="hidden" id="_mother_id" name="_mother_id">
+                        <input type="hidden" id="new_mother_id" name="new_mother_id">
+
+                        {{-- Inline Mother ID picker (shown only when needed) --}}
+                        <div id="mother-picker-section" class="col-md-12 mt-2" style="display:none;">
+                            <div class="alert alert-warning py-2">
+                                <p id="mother-picker-info" class="mb-2 small"></p>
+                                <div class="form-group mb-0">
+                                    <label class="font-weight-bold">Who becomes the new Mother ID for the old PAN group? <span class="text-danger">*</span></label>
+                                    <select id="mother-picker-select" class="form-control mt-1"></select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Update</button>
+                        <button type="submit" id="btn-update" class="btn btn-primary">Update</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+
 
     <div class="modal fade" id="modal-lg-sponsor">
         <div class="modal-dialog modal-lg">
@@ -605,37 +621,129 @@
                 }
             });
 
-            // AJAX form submit
-            $('#user-form').ajaxForm({
-                beforeSubmit: function() {
-                    $('#user-form button[type="submit"]').prop('disabled', true);
-                },
-                success: function(responseText) {
-                    const data = JSON.parse(responseText);
-                    $('#user-form button[type="submit"]').prop('disabled', false);
-                    $('.error-message').text('');
+            // Reset picker section when modal is closed
+            $('#modal-lg').on('hidden.bs.modal', function () {
+                $('#mother-picker-section').hide();
+                $('#mother-picker-select').closest('.form-group').show();
+                $('#mother-picker-select').empty();
+                $('#new_mother_id').val('');
+                $('#btn-update').prop('disabled', false).text('Update');
+            });
 
-                    if (data.status === "validation") {
-                        $.each(data.errors, function(key, val) {
-                            $('[name="' + key + '"]').closest('.form-group').find(
-                                '.error-message').text(val);
-                        });
-                    } else if (data.status === "success") {
-                        $('#user-form')[0].reset();
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success',
-                            text: data.message,
-                            timer: 1500,
-                            showConfirmButton: false
-                        }).then(() => window.location.reload());
+            // AJAX form submit with Mother ID change interception
+            $('#user-form').on('submit', function(e) {
+                e.preventDefault();
+
+                var motherId     = parseInt($('#_mother_id').val()) || 0;
+                var originalName = ($('#_original_name').val() || '').trim().toLowerCase();
+                var originalPan  = ($('#_original_pan').val() || '').trim().toUpperCase();
+                var newName      = $('#name').val().trim().toLowerCase();
+                var newPan       = $('#pan_card_no').val().trim().toUpperCase();
+                var pickerVisible = $('#mother-picker-section').is(':visible');
+
+                // If picker is visible, validate selection then save
+                if (pickerVisible) {
+                    if (!$('#mother-picker-select').val()) {
+                        Swal.fire('Required', 'Please select a new Mother ID for the old PAN group.', 'warning');
+                        return;
                     }
-                },
-                error: function() {
-                    $('#user-form button[type="submit"]').prop('disabled', false);
-                    console.error("Form submission error");
+                    $('#new_mother_id').val($('#mother-picker-select').val());
+                    submitUserForm();
+                    return;
+                }
+
+                if (motherId === 1 && (newName !== originalName || newPan !== originalPan)) {
+                    $.getJSON('{{ route("admin.user.check_mother_id_change") }}', {
+                        user_id:  $('#id').val(),
+                        new_name: $('#name').val().trim(),
+                        new_pan:  newPan,
+                    }, function(res) {
+                        if (res.case === 1 || res.case === 'blocked') {
+                            Swal.fire('Not Allowed', res.message, 'error');
+                        } else if (res.case === 2 || res.case === 3) {
+                            if (res.old_pan_children && res.old_pan_children.length > 0) {
+                                var info = res.case === 2
+                                    ? 'The existing Child ID <strong>' + res.existing_child.connection + ' — ' + res.existing_child.name + '</strong> will stay under the new PAN group. Select who takes over as Mother ID for the old PAN:'
+                                    : 'This is a fresh name &amp; PAN combination. Select who takes over as Mother ID for the old PAN group:';
+                                $('#mother-picker-info').html(info);
+
+                                // Show only the nearest (lowest ID) member as the single auto-selected option
+                                var $sel = $('#mother-picker-select').empty();
+                                function acctLabel(m) { return m == 2 ? 'Privilege 1' : m == 3 ? 'Privilege 2' : m == 1 ? 'Mother ID' : 'Child ID'; }
+                                var nearest = res.old_pan_children[0];
+                                var nearestIsPrivilege = nearest && (nearest.mother_id == 2 || nearest.mother_id == 3);
+
+                                if (nearest) {
+                                    var label = nearest.connection + ' — ' + nearest.name + ' (' + acctLabel(nearest.mother_id) + ')';
+                                    $sel.append('<option value="' + nearest.id + '">' + label + '</option>');
+                                }
+
+                                // Reference table — all PAN group members for info only
+                                if (res.old_pan_children.length > 0) {
+                                    var refHtml = '<div class="mt-2"><small class="text-muted font-weight-bold">All accounts under this PAN:</small><table class="table table-sm table-bordered mt-1 mb-0" style="font-size:12px;"><thead><tr><th>ID</th><th>Name</th><th>Type</th></tr></thead><tbody>';
+                                    $.each(res.old_pan_children, function(i, u) {
+                                        refHtml += '<tr><td>' + u.connection + '</td><td>' + u.name + '</td><td>' + acctLabel(u.mother_id) + '</td></tr>';
+                                    });
+                                    refHtml += '</tbody></table></div>';
+                                    $('#mother-picker-info').append(refHtml);
+                                }
+
+                                if (nearestIsPrivilege) {
+                                    // Block submit — nearest ID must be a Child ID first
+                                    var privType = acctLabel(nearest.mother_id);
+                                    $('#mother-picker-info').prepend(
+                                        '<div class="alert alert-danger py-2 mb-2" style="font-size:13px;">' +
+                                        '<strong>Cannot proceed:</strong> <strong>' + nearest.connection + '</strong> is a <strong>' + privType + '</strong>. ' +
+                                        'Please reassign the ' + privType + ' to another member first, then retry this update.' +
+                                        '</div>'
+                                    );
+                                    $sel.closest('.form-group').hide();
+                                    $sel.closest('.form-group').prev('label').hide();
+                                    $('#btn-update').prop('disabled', true).text('Confirm & Update');
+                                } else {
+                                    $('#btn-update').prop('disabled', false).text('Confirm & Update');
+                                }
+
+                                $('#mother-picker-section').show();
+                            } else {
+                                submitUserForm();
+                            }
+                        } else {
+                            submitUserForm();
+                        }
+                    }).fail(function() {
+                        Swal.fire('Error', 'Failed to validate the change. Please try again.', 'error');
+                    });
+                } else {
+                    submitUserForm();
                 }
             });
+
+            function submitUserForm() {
+                $('#btn-update').prop('disabled', true);
+                $.post('{{ route("userUpdate") }}', $('#user-form').serialize(), function(responseText) {
+                    var data = typeof responseText === 'string' ? JSON.parse(responseText) : responseText;
+                    $('#btn-update').prop('disabled', false);
+                    $('.error-message').text('');
+
+                    if (data.status === 'validation') {
+                        $.each(data.errors, function(key, val) {
+                            $('[name="' + key + '"]').closest('.form-group').find('.error-message').text(val);
+                        });
+                    } else if (data.status === 'success') {
+                        $('#user-form')[0].reset();
+                        Swal.fire({ icon: 'success', title: 'Success', text: data.message, timer: 1500, showConfirmButton: false })
+                            .then(() => window.location.reload());
+                    } else if (data.status === 'error') {
+                        Swal.fire('Error', data.message, 'error');
+                        $('#mother-picker-section').hide();
+                        $('#btn-update').text('Update');
+                    }
+                }).fail(function() {
+                    $('#btn-update').prop('disabled', false);
+                    Swal.fire('Error', 'Submission failed. Please try again.', 'error');
+                });
+            }
         });
 
         // Load user data into edit modal
@@ -646,13 +754,19 @@
                 success: function(response) {
                     if (response.status === 'success') {
                         const user = response.data;
+                        var pan = user.pan_card_no && user.pan_card_no.toUpperCase() !== 'STORE' ? user.pan_card_no : '';
                         $('#id').val(user.id);
                         $('#name').val(user.name);
-                        $('#pan_card_no').val(user.pan_card_no && user.pan_card_no.toUpperCase() !== 'STORE' ? user.pan_card_no : '');
+                        $('#pan_card_no').val(pan);
                         $('#email').val(user.email);
                         $('#phone_no').val(user.phone_no);
                         $('#pincode').val(user.pincode);
                         $('#address').val(user.address);
+                        // Store originals for Mother ID change detection
+                        $('#_original_name').val(user.name);
+                        $('#_original_pan').val(pan);
+                        $('#_mother_id').val(user.mother_id || 0);
+                        $('#new_mother_id').val('');
                         $('#modal-lg').modal('show');
                     } else {
                         Swal.fire('Error', response.message, 'error');

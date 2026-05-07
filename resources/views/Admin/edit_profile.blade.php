@@ -278,6 +278,31 @@
                                             @enderror
                                         </div>
                                     </div>
+
+                                    <div class="form-group row">
+                                        <label class="col-sm-4 col-form-label">
+                                            Sponsor Fill Direction
+                                            <small class="d-block text-muted" style="font-weight:normal;font-size:11px;">
+                                                New free members you sponsor will auto-place on this side of your tree
+                                            </small>
+                                        </label>
+                                        <div class="col-sm-8 d-flex align-items-center" style="gap:20px;flex-wrap:wrap;">
+                                            <div class="icheck-primary">
+                                                <input type="radio" name="fill_preference" id="pref_left" value="left"
+                                                    {{ ($user->fill_preference ?? 'left') === 'left' ? 'checked' : '' }}>
+                                                <label for="pref_left">
+                                                    <i class="fas fa-arrow-left mr-1"></i> Fill Left First
+                                                </label>
+                                            </div>
+                                            <div class="icheck-primary">
+                                                <input type="radio" name="fill_preference" id="pref_right" value="right"
+                                                    {{ ($user->fill_preference ?? 'left') === 'right' ? 'checked' : '' }}>
+                                                <label for="pref_right">
+                                                    <i class="fas fa-arrow-right mr-1"></i> Fill Right First
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <!-- /.card-body -->
 

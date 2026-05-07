@@ -53,6 +53,8 @@ Route::post('/register_wpan', [AdminController::class, 'store_user_wpan'])->name
 Route::get('/free-registration', [AuthController::class, 'register_wpan_rr'])->name('free-registration');
 Route::post('/register_wpan_rr', [AdminController::class, 'store_user_wpan_rr'])->name('register.store.wpan_rr');
 
+Route::get('/register', [AuthController::class, 'public_register'])->name('public-register');
+
 Route::middleware('auth')->group(function () {
 
     Route::get('/adminhome', [AdminController::class, 'admin'])->name('adminhome');
@@ -166,6 +168,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/userlist', [AdminController::class, 'userlist'])->name('userlist');
     Route::post('/user/update', [AdminController::class, 'update'])->name('userUpdate');
     Route::get('/user/details/{id}', [AdminController::class, 'getUserDetails'])->name('getUserDetails');
+    Route::get('/admin/user/check-mother-id-change', [AdminController::class, 'checkMotherIdChange'])->name('admin.user.check_mother_id_change');
     Route::get('companyRank_income', [AdminController::class, 'companyRank_income'])->name('companyRank_income');
 
 

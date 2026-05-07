@@ -908,4 +908,9 @@ class AuthController extends Controller
     {
         return view('Admin/register_wpan_rr');
     }
+
+    public function public_register()
+    {
+        return view('Admin/public_register');
+    }
 }
