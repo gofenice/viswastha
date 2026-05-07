@@ -6452,14 +6452,15 @@ class AdminController extends Controller
             $currenrsponsor = $sponsorId;
         }
 
-        // Auto-place under the sponsor's subtree using their fill preference
-        if ($request->sponsor_id) {
-            $sponsorUser = User::where('connection', $request->sponsor_id)->first();
-            $preference  = $sponsorUser->fill_preference ?? 'left';
-            $placement   = $this->findSponsorPlacement($sponsorUser->id, $preference);
-            $parent_id   = $placement['parent_id'];
-            $position    = $placement['position'];
-            $level       = $placement['level'];
+        // Auto-place under the assigned sponsor's subtree using their fill preference.
+        // $currenrsponsor is set for both cases: explicit sponsor or board member round-robin.
+        $sponsorUser = User::find($currenrsponsor);
+        if ($sponsorUser) {
+            $preference = $sponsorUser->fill_preference ?? 'left';
+            $placement  = $this->findSponsorPlacement($sponsorUser->id, $preference);
+            $parent_id  = $placement['parent_id'];
+            $position   = $placement['position'];
+            $level      = $placement['level'];
         } else {
             $parent_id = 996;
             $position  = 'left';
