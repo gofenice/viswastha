@@ -53,6 +53,8 @@ Route::post('/register_wpan', [AdminController::class, 'store_user_wpan'])->name
 Route::get('/free-registration', [AuthController::class, 'register_wpan_rr'])->name('free-registration');
 Route::post('/register_wpan_rr', [AdminController::class, 'store_user_wpan_rr'])->name('register.store.wpan_rr');
 
+Route::get('/register', [AuthController::class, 'public_register'])->name('public-register');
+
 Route::middleware('auth')->group(function () {
 
     Route::get('/adminhome', [AdminController::class, 'admin'])->name('adminhome');

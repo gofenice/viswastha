@@ -690,6 +690,9 @@ class AdminController extends Controller
         $user->phone_no = $request->mobile;
         $user->address = $request->address;
         $user->email = $request->email;
+        if (in_array($request->fill_preference, ['left', 'right'])) {
+            $user->fill_preference = $request->fill_preference;
+        }
 
         // Handle profile image upload and conversion
         if ($request->hasFile('profile_image')) {
@@ -6449,9 +6452,19 @@ class AdminController extends Controller
             $currenrsponsor = $sponsorId;
         }
 
-        $parent_id = 996;
-        $position = 'left';
-        $level = 1;
+        // Auto-place under the sponsor's subtree using their fill preference
+        if ($request->sponsor_id) {
+            $sponsorUser = User::where('connection', $request->sponsor_id)->first();
+            $preference  = $sponsorUser->fill_preference ?? 'left';
+            $placement   = $this->findSponsorPlacement($sponsorUser->id, $preference);
+            $parent_id   = $placement['parent_id'];
+            $position    = $placement['position'];
+            $level       = $placement['level'];
+        } else {
+            $parent_id = 996;
+            $position  = 'left';
+            $level     = 1;
+        }
 
         // Set PAN card to 'STORE' for simple registration
         $panCardNo = 'STORE';
@@ -6478,6 +6491,7 @@ class AdminController extends Controller
             'mother_id' => $motherid,
             'is_pair_matched' => '0',
             'assigned_board_member_id' => $sponsorId,
+            'registration_source' => $request->input('_source') === 'public_free' ? 'public_free' : null,
         ]);
 
         // Register the same user as a PrestaShop customer (non-blocking)
@@ -6493,8 +6507,79 @@ class AdminController extends Controller
 
     public function view_board_members()
     {
-        $boardMembers = \App\Models\BoardMember::with('user')->get();
-        return view('Admin.board_members_list', compact('boardMembers'));
+        $boardMembers = \App\Models\BoardMember::with('user')->orderBy('id')->get();
+
+        $boardMemberUserIds = $boardMembers->pluck('user_id')->toArray();
+
+        if (empty($boardMemberUserIds)) {
+            return view('Admin.board_members_list', [
+                'boardMembers'      => $boardMembers,
+                'assignmentStats'   => collect(),
+                'lastAssignedUsers' => collect(),
+                'nextBoardMemberId' => null,
+                'recentAssignments' => collect(),
+                'boardMemberNames'  => collect(),
+            ]);
+        }
+
+        // Per-member assignment counts and last assigned user — public free registrations only
+        $assignmentStats = DB::table('users')
+            ->whereIn('assigned_board_member_id', $boardMemberUserIds)
+            ->where('registration_source', 'public_free')
+            ->select(
+                'assigned_board_member_id',
+                DB::raw('COUNT(*) as total_assigned'),
+                DB::raw('MAX(created_at) as last_assigned_at')
+            )
+            ->groupBy('assigned_board_member_id')
+            ->get()
+            ->keyBy('assigned_board_member_id');
+
+        // Last assigned user's name per board member — public free only
+        $idList = implode(',', $boardMemberUserIds);
+        $lastAssignedUsers = DB::table('users as u1')
+            ->join(DB::raw("(SELECT assigned_board_member_id, MAX(id) as max_id FROM users WHERE assigned_board_member_id IN ({$idList}) AND registration_source = 'public_free' GROUP BY assigned_board_member_id) as latest"), function ($join) {
+                $join->on('u1.assigned_board_member_id', '=', 'latest.assigned_board_member_id')
+                     ->on('u1.id', '=', 'latest.max_id');
+            })
+            ->select('u1.assigned_board_member_id', 'u1.name as last_user_name', 'u1.connection as last_user_connection')
+            ->get()
+            ->keyBy('assigned_board_member_id');
+
+        // Determine next-in-queue board member (same round-robin logic as store_user_wpan_rr)
+        $nextBoardMemberId = null;
+        $lastUserWithBoardSponsor = User::whereNotNull('assigned_board_member_id')
+            ->whereIn('assigned_board_member_id', $boardMemberUserIds)
+            ->where('registration_source', 'public_free')
+            ->latest('id')
+            ->first();
+        if ($lastUserWithBoardSponsor) {
+            $lastIndex = array_search($lastUserWithBoardSponsor->assigned_board_member_id, $boardMemberUserIds);
+            $nextIndex = ($lastIndex !== false) ? ($lastIndex + 1) % count($boardMemberUserIds) : 0;
+            $nextBoardMemberId = $boardMemberUserIds[$nextIndex];
+        } else {
+            $nextBoardMemberId = $boardMemberUserIds[0];
+        }
+
+        // Recent 15 public free registrations via board member assignment
+        $recentAssignments = User::whereIn('assigned_board_member_id', $boardMemberUserIds)
+            ->where('registration_source', 'public_free')
+            ->orderByDesc('id')
+            ->limit(15)
+            ->select('id', 'name', 'connection', 'assigned_board_member_id', 'created_at')
+            ->get();
+
+        // Map board member user_id -> name for the recent assignments table
+        $boardMemberNames = $boardMembers->pluck('user.name', 'user_id');
+
+        return view('Admin.board_members_list', compact(
+            'boardMembers',
+            'assignmentStats',
+            'lastAssignedUsers',
+            'nextBoardMemberId',
+            'recentAssignments',
+            'boardMemberNames'
+        ));
     }
 
     public function store_board_member(Request $request)
@@ -6919,6 +7004,40 @@ class AdminController extends Controller
     }
 
     /**
+     * BFS through the binary subtree rooted at $rootId and return the first open
+     * ['parent_id' => X, 'position' => 'left'|'right', 'level' => N] slot,
+     * always checking the $preference side before the other side at each node.
+     */
+    private function findSponsorPlacement(int $rootId, string $preference): array
+    {
+        $other = $preference === 'left' ? 'right' : 'left';
+        $queue = [$rootId];
+
+        while (!empty($queue)) {
+            $nodeId = array_shift($queue);
+            $node   = User::find($nodeId);
+            if (!$node) continue;
+
+            $prefChild  = DB::table('users')->where('parent_id', $nodeId)->where('position', $preference)->value('id');
+            $otherChild = DB::table('users')->where('parent_id', $nodeId)->where('position', $other)->value('id');
+
+            if (!$prefChild) {
+                return ['parent_id' => $nodeId, 'position' => $preference, 'level' => ($node->level ?? 0) + 1];
+            }
+            if (!$otherChild) {
+                return ['parent_id' => $nodeId, 'position' => $other, 'level' => ($node->level ?? 0) + 1];
+            }
+
+            // Both slots filled — continue BFS in preference order
+            $queue[] = $prefChild;
+            $queue[] = $otherChild;
+        }
+
+        // Fallback (tree is somehow full — shouldn't happen)
+        return ['parent_id' => $rootId, 'position' => $preference, 'level' => 1];
+    }
+
+    /**
      * Check that $targetParentId is within the binary subtree rooted at $sponsorId.
      * Returns null if OK, or an error message string if the slot is outside the sponsor's tree.
      */
@@ -7252,56 +7371,132 @@ class AdminController extends Controller
         return response()->json(['status' => 'success', 'message' => 'Migration marked as complete. New registrations are now open.']);
     }
 
-    private function buildBinaryTreeData(User $user, int $depth): array
+    private function buildBinaryTreeData(User $rootNode, int $depth): array
     {
-        if ($depth === 0) {
+        // ── 1. BFS-load all visible nodes (up to $depth levels) in bulk ──────────
+        // One query per level instead of one query per node.
+        $nodesById = [$rootNode->id => $rootNode];
+        $frontier  = [$rootNode->id];
+
+        for ($lvl = 1; $lvl < $depth; $lvl++) {
+            if (empty($frontier)) break;
+            $children = User::whereIn('parent_id', $frontier)
+                ->select('id', 'name', 'connection', 'parent_id', 'position', 'level', 'user_image', 'pan_card_no', 'role')
+                ->get();
+            foreach ($children as $c) {
+                $nodesById[$c->id] = $c;
+            }
+            $frontier = $children->pluck('id')->toArray();
+        }
+
+        $visibleIds = array_keys($nodesById);
+
+        // ── 2. Build parent→children lookup from loaded data ──────────────────────
+        // childrenOf[parentId]['left'|'right'] = childId
+        $childrenOf = [];
+        foreach ($nodesById as $id => $node) {
+            if ($node->parent_id && isset($nodesById[$node->parent_id])) {
+                $childrenOf[$node->parent_id][$node->position] = $id;
+            }
+        }
+
+        // ── 3. Load all active packages for visible nodes in ONE query ────────────
+        $packageRows = DB::table('user_packages')
+            ->join('packages', 'packages.id', '=', 'user_packages.package_id')
+            ->whereIn('user_packages.user_id', $visibleIds)
+            ->where('user_packages.status', 1)
+            ->select('user_packages.user_id', 'packages.package_code', 'packages.amount', 'packages.color')
+            ->orderByDesc('packages.amount')
+            ->get()
+            ->groupBy('user_id');
+
+        // ── 4. Subtree count helper — BFS with cycle protection ───────────────────
+        // Avoids recursive CTEs entirely, so corrupt parent_id cycles can't crash
+        // the page. One query per BFS level; typically 10-15 queries for large trees.
+        $subtreeCount = function (int $childId): int {
+            $visited  = [$childId => true];
+            $frontier = [$childId];
+            while (!empty($frontier)) {
+                $children = DB::table('users')
+                    ->whereIn('parent_id', $frontier)
+                    ->whereNotIn('id', array_keys($visited))
+                    ->pluck('id')
+                    ->toArray();
+                foreach ($children as $id) {
+                    $visited[$id] = true;
+                }
+                $frontier = $children;
+            }
+            return count($visited) - 1; // exclude the root itself
+        };
+
+        // ── 5. Leg volume helper (same CTE as before, just inlined per call) ──────
+        $legVolume = function (int $childId, string $pkgCode): float {
+            $result = DB::select("
+                WITH RECURSIVE sub AS (
+                    SELECT id FROM users WHERE id = ?
+                    UNION ALL
+                    SELECT u.id FROM users u INNER JOIN sub s ON u.parent_id = s.id
+                )
+                SELECT COALESCE(SUM(p.binary_commission), 0) AS total
+                FROM user_packages up
+                JOIN packages p ON p.id = up.package_id
+                WHERE up.user_id IN (SELECT id FROM sub)
+                  AND up.status = 1
+                  AND up.created_at >= ?
+                  AND p.package_code = ?
+            ", [$childId, $this->binaryStartDate, $pkgCode]);
+            return (float) ($result[0]->total ?? 0);
+        };
+
+        // ── 6. Annotate every visible node with counts, volumes, package info ─────
+        foreach ($nodesById as $id => $node) {
+            $leftChildId  = $childrenOf[$id]['left']  ?? null;
+            $rightChildId = $childrenOf[$id]['right'] ?? null;
+
+            $node->left_count  = $leftChildId  ? $subtreeCount($leftChildId)  : 0;
+            $node->right_count = $rightChildId ? $subtreeCount($rightChildId) : 0;
+
+            $pkgs    = $packageRows->get($id, collect());
+            $codes   = $pkgs->pluck('package_code')->toArray();
+            $topPkg  = $pkgs->first();
+
+            $hasBasic   = in_array('basic_package',   $codes);
+            $hasPremium = in_array('premium_package', $codes);
+
+            $node->left_basic_vol    = ($hasBasic   && $leftChildId)  ? $legVolume($leftChildId,  'basic_package')   : 0;
+            $node->right_basic_vol   = ($hasBasic   && $rightChildId) ? $legVolume($rightChildId, 'basic_package')   : 0;
+            $node->left_premium_vol  = ($hasPremium && $leftChildId)  ? $legVolume($leftChildId,  'premium_package') : 0;
+            $node->right_premium_vol = ($hasPremium && $rightChildId) ? $legVolume($rightChildId, 'premium_package') : 0;
+
+            $node->package_color = $topPkg ? ($topPkg->color ?: '#6c757d') : null;
+
+            if (in_array('premium_package', $codes))     { $node->package_type = 'premium'; }
+            elseif (in_array('basic_package', $codes))   { $node->package_type = 'basic'; }
+            elseif (in_array('prime_package', $codes))   { $node->package_type = 'prime'; }
+            else                                          { $node->package_type = null; }
+        }
+
+        // ── 7. Assemble the nested array structure expected by the blade ──────────
+        return $this->assembleTreeNode($rootNode->id, $nodesById, $childrenOf, $depth);
+    }
+
+    private function assembleTreeNode(int $nodeId, array &$nodesById, array &$childrenOf, int $depth): array
+    {
+        $node = $nodesById[$nodeId] ?? null;
+        if (!$node || $depth === 0) {
             return ['user' => null, 'left' => null, 'right' => null];
         }
 
-        $left  = $user->leftChild()->first();
-        $right = $user->rightChild()->first();
+        $leftChildId  = $childrenOf[$nodeId]['left']  ?? null;
+        $rightChildId = $childrenOf[$nodeId]['right'] ?? null;
 
-        $user->left_count  = $user->leftDownlineCount();
-        $user->right_count = $user->rightDownlineCount();
-        // Flag: this node has children that are hidden because depth limit reached
-        $user->has_more = ($depth === 1) && ($left || $right);
-
-        // Resolve active packages (ordered by amount desc so first = highest)
-        $activePackages = \App\Models\UserPackage::where('user_packages.user_id', $user->id)
-            ->where('user_packages.status', 1)
-            ->join('packages', 'packages.id', '=', 'user_packages.package_id')
-            ->select('packages.package_code', 'packages.amount', 'packages.color')
-            ->orderBy('packages.amount', 'desc')
-            ->get();
-
-        $codes      = $activePackages->pluck('package_code')->toArray();
-        $topPackage = $activePackages->first();
-
-        $hasBasic   = in_array('basic_package',   $codes);
-        $hasPremium = in_array('premium_package', $codes);
-        $user->left_basic_vol    = $hasBasic   ? $this->legVolumeByPackageCode($user->id, 'left',  'basic_package')   : 0;
-        $user->left_premium_vol  = $hasPremium ? $this->legVolumeByPackageCode($user->id, 'left',  'premium_package') : 0;
-        $user->right_basic_vol   = $hasBasic   ? $this->legVolumeByPackageCode($user->id, 'right', 'basic_package')   : 0;
-        $user->right_premium_vol = $hasPremium ? $this->legVolumeByPackageCode($user->id, 'right', 'premium_package') : 0;
-
-        // Color from highest-amount active package; null if no package
-        $user->package_color = $topPackage ? ($topPackage->color ?: '#6c757d') : null;
-
-        // Keep package_type for backward-compat (openPackageModal activation check)
-        if (in_array('premium_package', $codes)) {
-            $user->package_type = 'premium';
-        } elseif (in_array('basic_package', $codes)) {
-            $user->package_type = 'basic';
-        } elseif (in_array('prime_package', $codes)) {
-            $user->package_type = 'prime';
-        } else {
-            $user->package_type = null;
-        }
+        $node->has_more = ($depth === 1) && ($leftChildId || $rightChildId);
 
         return [
-            'user'  => $user,
-            'left'  => ($depth > 1 && $left)  ? $this->buildBinaryTreeData($left,  $depth - 1) : null,
-            'right' => ($depth > 1 && $right) ? $this->buildBinaryTreeData($right, $depth - 1) : null,
+            'user'  => $node,
+            'left'  => ($depth > 1 && $leftChildId)  ? $this->assembleTreeNode($leftChildId,  $nodesById, $childrenOf, $depth - 1) : null,
+            'right' => ($depth > 1 && $rightChildId) ? $this->assembleTreeNode($rightChildId, $nodesById, $childrenOf, $depth - 1) : null,
         ];
     }
 
