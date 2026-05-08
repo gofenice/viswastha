@@ -287,20 +287,28 @@
                                             <th>Connection ID</th>
                                             <th>Assigned Board Member</th>
                                             <th>Registered At</th>
+                                            <th>Path</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach($recentAssignments as $i => $assignment)
-                                            <tr class="recent-assignment-row">
+                                            <tr>
                                                 <td>{{ $i + 1 }}</td>
                                                 <td>{{ $assignment->name }}</td>
                                                 <td><code>{{ $assignment->connection }}</code></td>
-                                                <td>
-                                                    {{ $boardMemberNames->get($assignment->assigned_board_member_id, 'Unknown') }}
-                                                </td>
+                                                <td>{{ $boardMemberNames->get($assignment->assigned_board_member_id, 'Unknown') }}</td>
                                                 <td>
                                                     {{ $assignment->created_at->format('d M Y, h:i A') }}
                                                     <small class="text-muted d-block">{{ $assignment->created_at->diffForHumans() }}</small>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-info btn-sm btn-view-path"
+                                                        data-sponsor-id="{{ $assignment->assigned_board_member_id }}"
+                                                        data-label="{{ $assignment->name }} ({{ $assignment->connection }})"
+                                                        data-user-connection="{{ $assignment->connection }}"
+                                                        title="View placement path">
+                                                        <i class="fas fa-sitemap"></i>
+                                                    </button>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -317,4 +325,92 @@
     </section>
 </div>
 
+{{-- ── Placement Path Modal ── --}}
+<div class="modal fade" id="placementPathModal" tabindex="-1">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-sitemap mr-1"></i>
+                    Placement Path — <span id="ppUserConn"></span>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="ppLoading" class="text-center p-4">
+                    <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+                </div>
+                <div id="ppContent" style="display:none;">
+                    <div class="px-3 pt-3 pb-1">
+                        <small class="text-muted">
+                            Sponsor: <strong id="ppSponsorName"></strong>
+                            &nbsp;|&nbsp;
+                            Fill preference: <span id="ppPreference" class="badge badge-info"></span>
+                        </small>
+                    </div>
+                    <div class="table-responsive px-3 pb-3">
+                        <table class="table table-bordered table-sm mt-2 mb-0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th style="width:70px;">Level</th>
+                                    <th>Name</th>
+                                    <th>Connection</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ppTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@endsection
+
+@section('footer')
+<script>
+const PLACEMENT_PATH_URL = '{{ route("board_members.placement_path") }}';
+
+function openPlacementModal(sponsorId, label, targetConnection) {
+    $('#ppUserConn').text(label);
+    $('#ppLoading').show();
+    $('#ppContent').hide();
+    $('#placementPathModal').modal('show');
+
+    $.get(PLACEMENT_PATH_URL, { sponsor_id: sponsorId }, function (res) {
+        $('#ppSponsorName').text(res.sponsor.name + ' (' + res.sponsor.connection + ')');
+        $('#ppPreference').text(res.preference.toUpperCase());
+
+        const tbody = $('#ppTableBody').empty();
+        for (var i = 0; i < res.path.length; i++) {
+            var row = res.path[i];
+            if (!row.vacant) {
+                tbody.append(
+                    '<tr><td>' + row.level + '</td>' +
+                    '<td>' + row.name + '</td>' +
+                    '<td><code>' + row.connection + '</code></td></tr>'
+                );
+                if (targetConnection && row.connection === targetConnection) {
+                    break;
+                }
+            }
+        }
+
+        $('#ppLoading').hide();
+        $('#ppContent').show();
+    }).fail(function () {
+        $('#ppLoading').html('<p class="text-danger p-3">Failed to load placement path.</p>');
+    });
+}
+
+$(document).on('click', '.btn-view-path', function (e) {
+    e.stopPropagation();
+    openPlacementModal($(this).data('sponsor-id'), $(this).data('label'), $(this).data('user-connection'));
+});
+
+$(document).on('click', '.recent-assignment-row', function () {
+    openPlacementModal($(this).data('sponsor-id'), $(this).data('user-conn') + ' — ' + $(this).data('user-name'));
+});
+</script>
 @endsection

@@ -171,20 +171,33 @@
                                     }, $node['user']->userPackages->toArray());
 
                                     // Display the user details
+                                    $leftCount = $node['user']->leftDownlineCount();
+                                    $rightCount = $node['user']->rightDownlineCount();
+                                    $hasChildren = ($leftCount + $rightCount) > 0;
+
                                     echo '<a href="' .
                                         route('binary_tree', $node['user']['id']) .
                                         '" class="tree-user">';
-                                    echo '<img src="' .
-                                        asset('assets/dist/img/user.svg') .
-                                        '" class="' .
-                                        $node['user']['border_class'] .
-                                        '" alt="user" width="50">';
+                                    if ($level == $maxLevel && $hasChildren) {
+                                        echo '<div class="node-img-wrap">';
+                                        echo '<img src="' .
+                                            asset('assets/dist/img/user.svg') .
+                                            '" class="' .
+                                            $node['user']['border_class'] .
+                                            '" alt="user" width="50">';
+                                        echo '<div class="has-more-badge" title="Has children below"><i class="fas fa-chevron-down"></i></div>';
+                                        echo '</div>';
+                                    } else {
+                                        echo '<img src="' .
+                                            asset('assets/dist/img/user.svg') .
+                                            '" class="' .
+                                            $node['user']['border_class'] .
+                                            '" alt="user" width="50">';
+                                    }
                                     echo '<p class="mb-0">' . $node['user']['name'] . '</p>';
                                     echo '<p class="mb-0">' . $node['user']['connection'] . '</p>';
                                     // echo '<p class="mb-0">' . $node['user']['email'] . '</p>';
 
-                                    $leftCount = $node['user']->leftDownlineCount();
-                                    $rightCount = $node['user']->rightDownlineCount();
                                     echo '<p class="mb-0"><b>' . $leftCount . ' | ' . $rightCount . '</b></p>';
                                     echo '</a>';
                                     if (!empty(array_diff([13], $packages))) {

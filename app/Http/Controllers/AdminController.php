@@ -6583,6 +6583,41 @@ class AdminController extends Controller
         ));
     }
 
+    public function boardMemberPlacementPath(Request $request)
+    {
+        $sponsor = User::find((int) $request->get('sponsor_id'));
+        if (!$sponsor) {
+            return response()->json(['error' => 'Sponsor not found'], 404);
+        }
+
+        $preference = $sponsor->fill_preference ?? 'left';
+        $nodeId     = $sponsor->id;
+        $path       = [];
+        $level      = 1;
+
+        while (true) {
+            $child = User::where('parent_id', $nodeId)
+                ->where('position', $preference)
+                ->select('id', 'name', 'connection')
+                ->first();
+
+            if (!$child) {
+                $path[] = ['level' => $level, 'name' => 'VACANT', 'connection' => null, 'vacant' => true];
+                break;
+            }
+
+            $path[] = ['level' => $level, 'name' => $child->name, 'connection' => $child->connection, 'vacant' => false];
+            $nodeId = $child->id;
+            $level++;
+        }
+
+        return response()->json([
+            'sponsor'    => ['name' => $sponsor->name, 'connection' => $sponsor->connection],
+            'preference' => $preference,
+            'path'       => $path,
+        ]);
+    }
+
     public function store_board_member(Request $request)
     {
         $request->validate([
@@ -7005,37 +7040,31 @@ class AdminController extends Controller
     }
 
     /**
-     * BFS through the binary subtree rooted at $rootId and return the first open
-     * ['parent_id' => X, 'position' => 'left'|'right', 'level' => N] slot,
-     * always checking the $preference side before the other side at each node.
+     * Walk strictly down the $preference leg from $rootId (always left→left→left
+     * for "left", always right→right→right for "right") until the slot is vacant,
+     * then place there. This gives true extreme-left / extreme-right placement.
      */
     private function findSponsorPlacement(int $rootId, string $preference): array
     {
-        $other = $preference === 'left' ? 'right' : 'left';
-        $queue = [$rootId];
+        $nodeId = $rootId;
 
-        while (!empty($queue)) {
-            $nodeId = array_shift($queue);
-            $node   = User::find($nodeId);
-            if (!$node) continue;
+        while (true) {
+            $childId = DB::table('users')
+                ->where('parent_id', $nodeId)
+                ->where('position', $preference)
+                ->value('id');
 
-            $prefChild  = DB::table('users')->where('parent_id', $nodeId)->where('position', $preference)->value('id');
-            $otherChild = DB::table('users')->where('parent_id', $nodeId)->where('position', $other)->value('id');
-
-            if (!$prefChild) {
-                return ['parent_id' => $nodeId, 'position' => $preference, 'level' => ($node->level ?? 0) + 1];
+            if (!$childId) {
+                $node = User::find($nodeId);
+                return [
+                    'parent_id' => $nodeId,
+                    'position'  => $preference,
+                    'level'     => ($node->level ?? 0) + 1,
+                ];
             }
-            if (!$otherChild) {
-                return ['parent_id' => $nodeId, 'position' => $other, 'level' => ($node->level ?? 0) + 1];
-            }
 
-            // Both slots filled — continue BFS in preference order
-            $queue[] = $prefChild;
-            $queue[] = $otherChild;
+            $nodeId = $childId;
         }
-
-        // Fallback (tree is somehow full — shouldn't happen)
-        return ['parent_id' => $rootId, 'position' => $preference, 'level' => 1];
     }
 
     /**
@@ -7282,7 +7311,7 @@ class AdminController extends Controller
             });
 
         if ($treeOnly) {
-            $rootId = DB::table('binary_settings')->value('root_user_id');
+            $rootId = DB::table('binary_tree_settings')->value('root_user_id');
             $builder->where(function ($q) use ($rootId) {
                 $q->whereNotNull('parent_id');
                 if ($rootId) $q->orWhere('id', $rootId);
@@ -7399,6 +7428,17 @@ class AdminController extends Controller
             if ($node->parent_id && isset($nodesById[$node->parent_id])) {
                 $childrenOf[$node->parent_id][$node->position] = $id;
             }
+        }
+
+        // ── 2b. Peek one extra level so leaf nodes can get has_more = true ─────────
+        // Only IDs/positions are fetched — these nodes are never rendered.
+        if (!empty($frontier)) {
+            User::whereIn('parent_id', $frontier)
+                ->select('id', 'parent_id', 'position')
+                ->get()
+                ->each(function ($c) use (&$childrenOf) {
+                    $childrenOf[$c->parent_id][$c->position] = $c->id;
+                });
         }
 
         // ── 3. Load all active packages for visible nodes in ONE query ────────────

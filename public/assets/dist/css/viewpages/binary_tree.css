@@ -58,3 +58,35 @@ a.tree-user {
 .inner {
     color: #fff !important;
 }
+
+.node-img-wrap {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+
+.has-more-badge {
+    position: absolute;
+    right: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #dc3545;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(220,53,69,.5);
+    transition: transform .15s, box-shadow .15s;
+    z-index: 4;
+    text-decoration: none;
+}
+
+.has-more-badge:hover {
+    transform: translateY(-50%) scale(1.2);
+    box-shadow: 0 5px 16px rgba(220,53,69,.7);
+}

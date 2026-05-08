@@ -406,4 +406,5 @@ Route::middleware('auth')->group(function () {
     Route::get('/view_board_members', [AdminController::class, 'view_board_members'])->name('view_board_members');
     Route::post('/store_board_member', [AdminController::class, 'store_board_member'])->name('store_board_member');
     Route::get('/delete_board_member/{id}', [AdminController::class, 'delete_board_member'])->name('delete_board_member');
+    Route::get('/board-members/placement-path', [AdminController::class, 'boardMemberPlacementPath'])->name('board_members.placement_path');
 });
