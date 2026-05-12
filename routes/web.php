@@ -304,6 +304,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/redeemPrivilegeUsers', [AdminController::class, 'redeemPrivilegeUsers'])->name('redeemPrivilegeUsers');
     Route::post('/adminToPrivilege', [AdminController::class, 'adminToPrivilege'])->name('adminToPrivilege');
 
+    // Purchase Wallet (new — separate from sunflower model wallets)
+    Route::get('/purchase-wallets', [AdminController::class, 'purchaseWallets'])->name('purchase_wallets');
+
     // Board Routes
     Route::get('/board_users', [AdminController::class, 'board_users'])->name('board_users');
     Route::post('/add_board_user', [AdminController::class, 'add_board_user'])->name('add_board_user');

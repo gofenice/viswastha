@@ -66,6 +66,7 @@ use App\Models\UserBankingDetail;
 use App\Models\UserRankHistory;
 use App\Models\WalletTransactionDetail;
 use App\Models\ShopReceipt;
+use App\Models\PurchaseWalletEntry;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -667,6 +668,23 @@ class AdminController extends Controller
         $package = Package::findOrFail($packageId);
         $package->delete();
         return redirect()->route('package')->with('success', 'Package deleted successfully.');
+    }
+
+    public function purchaseWallets()
+    {
+        $types = ['privilege', 'board', 'executive', 'royalty'];
+
+        $totals = [];
+        foreach ($types as $type) {
+            $totals[$type] = PurchaseWalletEntry::where('wallet_type', $type)->sum('amount');
+        }
+
+        $entries = PurchaseWalletEntry::with(['user', 'package'])
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('wallet_type');
+
+        return view('Admin.purchase_wallets', compact('totals', 'entries'));
     }
 
     public function edit_profile(Request $request)
@@ -2278,12 +2296,11 @@ class AdminController extends Controller
 
         if ($amount <= 0) return;
 
-        RoyaltyIncomeWallet::create([
+        PurchaseWalletEntry::create([
             'user_id'     => $userId,
             'package_id'  => $package_id,
+            'wallet_type' => 'royalty',
             'amount'      => $amount,
-            'is_redeemed' => 0,
-            'status'      => 0,
         ]);
     }
 
@@ -4693,12 +4710,11 @@ class AdminController extends Controller
 
         if ($amount <= 0) return;
 
-        PrivilegeIncomeWallet::create([
+        PurchaseWalletEntry::create([
             'user_id'     => $userId,
             'package_id'  => $package_id,
+            'wallet_type' => 'privilege',
             'amount'      => $amount,
-            'is_redeemed' => 0,
-            'status'      => 0,
         ]);
     }
 
@@ -4835,12 +4851,11 @@ class AdminController extends Controller
 
         if ($amount <= 0) return;
 
-        BoardIncomeWallet::create([
+        PurchaseWalletEntry::create([
             'user_id'     => $userId,
             'package_id'  => $package_id,
+            'wallet_type' => 'board',
             'amount'      => $amount,
-            'is_redeemed' => 0,
-            'status'      => 0,
         ]);
     }
 
@@ -4977,12 +4992,11 @@ class AdminController extends Controller
 
         if ($amount <= 0) return;
 
-        ExecutiveIncomeWallet::create([
+        PurchaseWalletEntry::create([
             'user_id'     => $userId,
             'package_id'  => $package_id,
+            'wallet_type' => 'executive',
             'amount'      => $amount,
-            'is_redeemed' => 0,
-            'status'      => 0,
         ]);
     }
 

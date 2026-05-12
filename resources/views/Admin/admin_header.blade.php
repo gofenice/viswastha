@@ -359,6 +359,12 @@
                                 </a>
                             </li>
                             <li class="nav-item has-treeview">
+                                <a href="{{ route('purchase_wallets') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-wallet"></i>
+                                    <p>Purchase Wallets</p>
+                                </a>
+                            </li>
+                            <li class="nav-item has-treeview">
                                 <a href="{{ route('statement') }}" class="nav-link">
                                     <i class="nav-icon fas fa-university"></i>
                                     <p>
