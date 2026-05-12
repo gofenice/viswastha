@@ -428,37 +428,8 @@
 
 
 
-            $('#user-form').ajaxForm({
-                beforeSubmit: function(formData, jqForm, options) {
-                    $('#user-form button[type="submit"]').prop('disabled', true);
-                },
-                success: function(responseText, statusText, xhr, $form) {
-                    const data = JSON.parse(responseText);
-                    // console.log(data);
-                    $('#user-form button[type="submit"]').prop('disabled', false);
-                    $('#user-form .error-message').text("");
-                    if (data.status == "validation") {
-                        $.each(data.errors, function(key, val) {
-                            $('[name="' + key + '"]').closest('.form-group').find(
-                                '.error-message').text(val);
-                        })
-                    } else if (data.status == "success") {
-                        $form[0].reset();
-                        window.location.reload();
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success',
-                            text: data.message,
-                            timer: 1500,
-                            showConfirmButton: false
-                        });
-                    }
-                },
-                error: function(xhr, status, error) {
-                    $('#user-form button[type="submit"]').prop('disabled', false);
-                    console.error(error, xhr, status);
-                }
-            });
+            // Form submission is handled entirely by the on('submit') handler below,
+            // which intercepts Mother ID changes before calling submitUserForm().
 
 
             $("input[name='sponsor_id']").on("blur", function() {

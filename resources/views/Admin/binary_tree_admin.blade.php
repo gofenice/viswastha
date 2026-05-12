@@ -1029,18 +1029,27 @@ function setPlacementTarget(parentId, position) {
     $('#regTypeWpan').prop('checked', true);
     $('#panCardField').hide();
     $('#panCardInput').prop('required', false);
+    // Reset submit button in case a previous request left it disabled
+    $('#btnPlaceUser').prop('disabled', false).text('Place User');
 }
 
 liveSearch('transferSearch', 'transferSearchResults', 'selectedTransferUserId', 'transferSelectedInfo');
 
 $('#btnPlaceUser').on('click', function () {
+    const $btn = $(this);
+    if ($btn.prop('disabled')) return;
+
     const activeTab = $('#placeTabs .nav-link.active').attr('href');
     const parentId  = $('#placementParentId').val();
     const position  = $('#placementPosition').val();
 
+    const enableBtn = () => $btn.prop('disabled', false).text('Place User');
+    const disableBtn = () => $btn.prop('disabled', true).text('Processing...');
+
     if (activeTab === '#tabTransfer') {
         const userId = $('#selectedTransferUserId').val();
         if (!userId) { Swal.fire('Warning', 'Please select a user to transfer.', 'warning'); return; }
+        disableBtn();
         postJSON(ROUTES.transferUser, { user_id: userId, parent_id: parentId, position: position }, function (res) {
             if (res.status === 'success') {
                 Swal.fire('Placed!', res.message, 'success').then(function () {
@@ -1049,6 +1058,7 @@ $('#btnPlaceUser').on('click', function () {
                 });
             } else {
                 Swal.fire('Error', res.message, 'error');
+                enableBtn();
             }
         });
     } else {
@@ -1060,6 +1070,8 @@ $('#btnPlaceUser').on('click', function () {
         // Toggle PAN required before validity check
         $('#panCardInput').prop('required', usePan);
         if (!form.checkValidity()) { form.reportValidity(); return; }
+
+        disableBtn();
 
         const data = new FormData(form);
         data.append('parent_id', parentId);
@@ -1087,11 +1099,16 @@ $('#btnPlaceUser').on('click', function () {
                     let msg = '';
                     $.each(res.errors, function (k, v) { msg += v[0] + '<br>'; });
                     Swal.fire({ icon: 'error', title: 'Validation', html: msg });
+                    enableBtn();
                 } else {
                     Swal.fire('Error', res.message || 'Registration failed.', 'error');
+                    enableBtn();
                 }
             },
-            error: function () { Swal.fire('Error', 'Registration request failed.', 'error'); }
+            error: function () {
+                Swal.fire('Error', 'Registration request failed.', 'error');
+                enableBtn();
+            }
         });
     }
 });
