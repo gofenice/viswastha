@@ -1216,31 +1216,6 @@ class AdminController extends Controller
                     ]);
                 }
 
-                // New accounts with same PAN must be placed within the Mother ID's binary subtree
-                $motherUser = DB::table('users')
-                    ->where('pan_card_no', $request->pan_card_no)
-                    ->where('mother_id', 1)
-                    ->first();
-
-                if ($motherUser) {
-                    $inSubtree = DB::select("
-                        WITH RECURSIVE subtree AS (
-                            SELECT id FROM users WHERE id = ?
-                            UNION ALL
-                            SELECT u.id FROM users u
-                            INNER JOIN subtree s ON u.parent_id = s.id
-                        )
-                        SELECT COUNT(*) as cnt FROM subtree WHERE id = ?
-                    ", [$motherUser->id, $parent_id]);
-
-                    if (($inSubtree[0]->cnt ?? 0) == 0) {
-                        return json_encode([
-                            'status' => 'error',
-                            'message' => 'This user must be placed within the Mother ID\'s binary tree.',
-                        ]);
-                    }
-                }
-
                 $motherId1Exists = DB::table('users')
                     ->where('pan_card_no', $request->pan_card_no)
                     ->where('mother_id', 1)
@@ -1405,30 +1380,6 @@ class AdminController extends Controller
 
                 if (strtolower($existingUser->name) !== strtolower($request->name)) {
                     return redirect()->back()->with('error', "The name does not match the existing record for this PAN card.");
-                }
-
-                // New accounts with same PAN must be placed within the Mother ID's binary subtree
-                $motherUser = DB::table('users')
-                    ->where('pan_card_no', $request->pan_card_no)
-                    ->where('mother_id', 1)
-                    ->first();
-
-                if ($motherUser) {
-                    // user_register always places at parent_id=996, so subtree check against 996
-                    $checkParent = 996;
-                    $inSubtree = DB::select("
-                        WITH RECURSIVE subtree AS (
-                            SELECT id FROM users WHERE id = ?
-                            UNION ALL
-                            SELECT u.id FROM users u
-                            INNER JOIN subtree s ON u.parent_id = s.id
-                        )
-                        SELECT COUNT(*) as cnt FROM subtree WHERE id = ?
-                    ", [$motherUser->id, $checkParent]);
-
-                    if (($inSubtree[0]->cnt ?? 0) == 0) {
-                        return redirect()->back()->with('error', 'This user must be placed within the Mother ID\'s binary tree.');
-                    }
                 }
 
                 $motherId1Exists = DB::table('users')
@@ -7411,7 +7362,7 @@ class AdminController extends Controller
         for ($lvl = 1; $lvl < $depth; $lvl++) {
             if (empty($frontier)) break;
             $children = User::whereIn('parent_id', $frontier)
-                ->select('id', 'name', 'connection', 'parent_id', 'position', 'level', 'user_image', 'pan_card_no', 'role')
+                ->select('id', 'name', 'connection', 'parent_id', 'position', 'level', 'user_image', 'pan_card_no', 'role', 'mother_id')
                 ->get();
             foreach ($children as $c) {
                 $nodesById[$c->id] = $c;
