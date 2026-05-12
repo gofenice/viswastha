@@ -222,6 +222,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/childToMotherIncome_list', [AdminController::class, 'childToMotherIncome_list'])->name('childToMotherIncome_list');
     Route::get('/transferToWallet', [AdminController::class, 'transferToWallet'])->name('transferToWallet');
+    Route::get('/my-income', [AdminController::class, 'myIncome'])->name('my_income');
+    Route::post('/my-income/transfer', [AdminController::class, 'myIncomeTransfer'])->name('my_income.transfer');
 
     Route::post('/levelIncomeTransfer', [AdminController::class, 'levelIncomeTransfer'])->name('levelIncomeTransfer');
     Route::post('/rankIncomeTransfer', [AdminController::class, 'rankIncomeTransfer'])->name('rankIncomeTransfer');

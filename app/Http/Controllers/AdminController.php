@@ -2896,6 +2896,71 @@ class AdminController extends Controller
         return view('Admin.childToMotherIncome_list', compact('childToMotherIncome_list'));
     }
 
+    public function myIncome()
+    {
+        $user   = auth()->user();
+        $userId = $user->id;
+
+        $binaryWallet       = \App\Models\BinaryWallet::forUser($userId);
+        $binaryPairLifetime = \App\Models\BinaryTransaction::where('user_id', $userId)->where('type', 'binary_pair')->sum('amount');
+        $sponsorLifetime    = \App\Models\BinaryTransaction::where('user_id', $userId)->whereIn('type', ['binary_sponsor', 'prime_sponsor'])->sum('amount');
+
+        $types = ['privilege', 'board', 'executive', 'royalty'];
+        $newIncomes = [];
+        foreach ($types as $type) {
+            $newIncomes[$type] = [
+                'available' => UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->whereNull('transferred_at')->sum('amount'),
+                'lifetime'  => UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->sum('amount'),
+                'history'   => UserWalletCredit::with('distribution')->where('user_id', $userId)->where('wallet_type', $type)->orderByDesc('id')->get(),
+            ];
+        }
+
+        $isMember = [
+            'privilege' => PrivilegeUser::where('user_id', $userId)->where('status', 1)->exists(),
+            'board'     => BoardUser::where('user_id', $userId)->where('status', 1)->exists(),
+            'executive' => ExecutiveUser::where('user_id', $userId)->where('status', 1)->exists(),
+            'royalty'   => RoyaltyIncomeUser::where('user_id', $userId)->where('status', 1)->exists(),
+        ];
+
+        return view('Admin.my_income', compact('user', 'binaryWallet', 'binaryPairLifetime', 'sponsorLifetime', 'newIncomes', 'isMember'));
+    }
+
+    public function myIncomeTransfer(Request $request)
+    {
+        $type   = $request->input('type');
+        $userId = auth()->id();
+
+        if ($type === 'binary') {
+            $wallet = \App\Models\BinaryWallet::forUser($userId);
+            $amount = (float) $wallet->balance;
+            if ($amount <= 0) return back()->with('error', 'No binary wallet balance to transfer.');
+            DB::transaction(function () use ($userId, $amount, $wallet) {
+                $wallet->debit($amount);
+                User::where('id', $userId)->increment('total_income', $amount);
+                \App\Models\BinaryTransaction::create([
+                    'user_id'     => $userId,
+                    'type'        => 'withdrawal',
+                    'amount'      => $amount,
+                    'description' => 'Transferred to main wallet',
+                ]);
+            });
+            return back()->with('success', '₹' . number_format($amount, 2) . ' transferred to your main wallet.');
+        }
+
+        $validTypes = ['privilege', 'board', 'executive', 'royalty'];
+        if (!in_array($type, $validTypes)) return back()->with('error', 'Invalid income type.');
+
+        $credits = UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->whereNull('transferred_at')->get();
+        $amount  = (float) $credits->sum('amount');
+        if ($amount <= 0) return back()->with('error', 'No ' . ucfirst($type) . ' income balance to transfer.');
+
+        DB::transaction(function () use ($userId, $amount, $credits, $type) {
+            UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->whereNull('transferred_at')->update(['transferred_at' => now()]);
+            User::where('id', $userId)->increment('total_income', $amount);
+        });
+        return back()->with('success', '₹' . number_format($amount, 2) . ' from ' . ucfirst($type) . ' wallet transferred to your main wallet.');
+    }
+
     public function transferToWallet()
     {
         $userId = auth()->id();

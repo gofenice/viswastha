@@ -953,6 +953,12 @@
 
                         @if (Auth::check() && Auth::user()->role !== 'superadmin')
                             <li class="nav-item has-treeview">
+                                <a href="{{ route('my_income') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-hand-holding-usd"></i>
+                                    <p>My Income</p>
+                                </a>
+                            </li>
+                            <li class="nav-item has-treeview">
                                 <a href="{{ route('your_account') }}" class="nav-link earning">
                                     <i class="nav-icon fas fa-university"></i>
                                     <p>
