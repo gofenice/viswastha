@@ -594,20 +594,24 @@ class AdminController extends Controller
     public function add_package(Request $request)
     {
         $validated = $request->validate([
-            'packageName'        => ['required', 'string', 'max:255'],
-            'packageAmount'      => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],
-            'binary_commission'  => ['required', 'numeric', 'min:0'],
-            'sponsor_commission' => ['required', 'numeric', 'min:0'],
-            'daily_pair_cap'     => ['required', 'integer', 'min:0'],
-            'status'             => 'required|boolean',
-            'packageCategory'    => 'required',
-            'packageCat'         => 'required',
+            'packageName'              => ['required', 'string', 'max:255'],
+            'packageAmount'            => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],
+            'binary_commission'        => ['required', 'numeric', 'min:0'],
+            'sponsor_commission'       => ['required', 'numeric', 'min:0'],
+            'daily_pair_cap'           => ['required', 'integer', 'min:0'],
+            'status'                   => 'required|boolean',
+            'packageCategory'          => 'required',
+            'packageCat'               => 'required',
+            'privilege_wallet_income'  => ['nullable', 'numeric', 'min:0'],
+            'board_wallet_income'      => ['nullable', 'numeric', 'min:0'],
+            'executive_wallet_income'  => ['nullable', 'numeric', 'min:0'],
+            'royalty_wallet_income'    => ['nullable', 'numeric', 'min:0'],
         ]);
         Package::create([
-            'name'                        => $validated['packageName'],
-            'amount'                      => $validated['packageAmount'],
-            'binary_commission'           => $validated['binary_commission'],
-            'sponsor_commission'          => $validated['sponsor_commission'],
+            'name'                          => $validated['packageName'],
+            'amount'                        => $validated['packageAmount'],
+            'binary_commission'             => $validated['binary_commission'],
+            'sponsor_commission'            => $validated['sponsor_commission'],
             'sponsor_eligible_package_ids'  => array_filter(array_map('intval', $request->input('sponsor_eligible_package_ids', []))),
             'auto_upgrade_count'            => $request->input('auto_upgrade_count') ?: null,
             'auto_upgrade_to_package_id'    => $request->input('auto_upgrade_to_package_id') ?: null,
@@ -616,6 +620,10 @@ class AdminController extends Controller
             'package_cat'                   => $validated['packageCat'],
             'status'                        => $validated['status'],
             'color'                         => $request->input('color') ?: '#6c757d',
+            'privilege_wallet_income'       => $validated['privilege_wallet_income'] ?? 0,
+            'board_wallet_income'           => $validated['board_wallet_income'] ?? 0,
+            'executive_wallet_income'       => $validated['executive_wallet_income'] ?? 0,
+            'royalty_wallet_income'         => $validated['royalty_wallet_income'] ?? 0,
         ]);
         return redirect()->route('package')->with('success', 'Added Package Successfully.');
     }
@@ -623,25 +631,33 @@ class AdminController extends Controller
     public function edit_package(Request $request)
     {
         $validated = $request->validate([
-            'name'               => 'required|string|max:255',
-            'amount'             => 'required|numeric',
-            'binary_commission'  => 'required|numeric|min:0',
-            'sponsor_commission' => 'required|numeric|min:0',
-            'daily_pair_cap'     => 'required|integer|min:0',
-            'status'             => 'required|boolean',
+            'name'                     => 'required|string|max:255',
+            'amount'                   => 'required|numeric',
+            'binary_commission'        => 'required|numeric|min:0',
+            'sponsor_commission'       => 'required|numeric|min:0',
+            'daily_pair_cap'           => 'required|integer|min:0',
+            'status'                   => 'required|boolean',
+            'privilege_wallet_income'  => ['nullable', 'numeric', 'min:0'],
+            'board_wallet_income'      => ['nullable', 'numeric', 'min:0'],
+            'executive_wallet_income'  => ['nullable', 'numeric', 'min:0'],
+            'royalty_wallet_income'    => ['nullable', 'numeric', 'min:0'],
         ]);
         $package = Package::findOrFail($request->input('id'));
         $package->update([
-            'name'                        => $validated['name'],
-            'amount'                      => $validated['amount'],
-            'binary_commission'           => $validated['binary_commission'],
-            'sponsor_commission'          => $validated['sponsor_commission'],
+            'name'                          => $validated['name'],
+            'amount'                        => $validated['amount'],
+            'binary_commission'             => $validated['binary_commission'],
+            'sponsor_commission'            => $validated['sponsor_commission'],
             'sponsor_eligible_package_ids'  => array_filter(array_map('intval', $request->input('sponsor_eligible_package_ids', []))),
             'auto_upgrade_count'            => $request->input('auto_upgrade_count') ?: null,
             'auto_upgrade_to_package_id'    => $request->input('auto_upgrade_to_package_id') ?: null,
             'daily_pair_cap'                => $validated['daily_pair_cap'],
             'status'                        => $validated['status'],
             'color'                         => $request->input('color') ?: '#6c757d',
+            'privilege_wallet_income'       => $validated['privilege_wallet_income'] ?? 0,
+            'board_wallet_income'           => $validated['board_wallet_income'] ?? 0,
+            'executive_wallet_income'       => $validated['executive_wallet_income'] ?? 0,
+            'royalty_wallet_income'         => $validated['royalty_wallet_income'] ?? 0,
         ]);
         return redirect()->route('package')->with('successchange', 'Package updated successfully.');
     }

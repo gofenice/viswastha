@@ -124,6 +124,36 @@
                             @enderror
                         </div>
                     </div>
+
+                    {{-- Wallet Income Distribution --}}
+                    <div class="form-group row">
+                        <div class="col-sm-12"><hr class="my-1"><small class="text-muted font-weight-bold">Wallet Income Distribution (per purchase)</small></div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">Privilege Member Wallet (₹)</label>
+                        <div class="col-sm-8">
+                            <input type="number" step="0.01" min="0" class="form-control" name="privilege_wallet_income" placeholder="0.00" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">Board Member Wallet (₹)</label>
+                        <div class="col-sm-8">
+                            <input type="number" step="0.01" min="0" class="form-control" name="board_wallet_income" placeholder="0.00" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">Executive Wallet (₹)</label>
+                        <div class="col-sm-8">
+                            <input type="number" step="0.01" min="0" class="form-control" name="executive_wallet_income" placeholder="0.00" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">Royalty Wallet (₹)</label>
+                        <div class="col-sm-8">
+                            <input type="number" step="0.01" min="0" class="form-control" name="royalty_wallet_income" placeholder="0.00" value="0">
+                        </div>
+                    </div>
+
                     <div class="form-group row">
                         <label for="packageCategory" class="col-sm-4 col-form-label">Category</label>
                         <div class="col-sm-8">
@@ -189,6 +219,10 @@
                             <th>Binary BV</th>
                             <th>Sponsor ₹</th>
                             <th>Daily Cap</th>
+                            <th>Privilege ₹</th>
+                            <th>Board ₹</th>
+                            <th>Executive ₹</th>
+                            <th>Royalty ₹</th>
                             <th>Category</th>
                             <th>Active/Inactive</th>
                             <th>Type</th>
@@ -205,6 +239,10 @@
                                     <td>{{ number_format($package->binary_commission, 2) }}</td>
                                     <td>₹{{ number_format($package->sponsor_commission, 2) }}</td>
                                     <td>{{ $package->daily_pair_cap }}</td>
+                                    <td>₹{{ number_format($package->privilege_wallet_income, 2) }}</td>
+                                    <td>₹{{ number_format($package->board_wallet_income, 2) }}</td>
+                                    <td>₹{{ number_format($package->executive_wallet_income, 2) }}</td>
+                                    <td>₹{{ number_format($package->royalty_wallet_income, 2) }}</td>
                                     <td>
                                         @if ($package->package_code == 'basic_package')
                                             Basic Package
@@ -226,7 +264,7 @@
                                     <td>
                                         <button class="btn btn-success btn-sm" data-toggle="modal"
                                             data-target="#editPackageModal"
-                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}', '{{ $package->binary_commission }}', '{{ $package->sponsor_commission }}', '{{ $package->daily_pair_cap }}', {{ json_encode($package->sponsor_eligible_package_ids ?? []) }}, '{{ $package->auto_upgrade_count }}', '{{ $package->auto_upgrade_to_package_id }}', '{{ $package->color ?? '#6c757d' }}')">
+                                            onclick="editPackage('{{ $package->id }}', '{{ $package->name }}', '{{ $package->amount }}', '{{ $package->status }}', '{{ $package->binary_commission }}', '{{ $package->sponsor_commission }}', '{{ $package->daily_pair_cap }}', {{ json_encode($package->sponsor_eligible_package_ids ?? []) }}, '{{ $package->auto_upgrade_count }}', '{{ $package->auto_upgrade_to_package_id }}', '{{ $package->color ?? '#6c757d' }}', '{{ $package->privilege_wallet_income }}', '{{ $package->board_wallet_income }}', '{{ $package->executive_wallet_income }}', '{{ $package->royalty_wallet_income }}')">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         {{-- <button class="btn btn-danger btn-sm" data-toggle="modal"
@@ -305,6 +343,23 @@
                                 <input type="number" min="0" step="1" class="form-control" id="editDailyPairCap" name="daily_pair_cap" required>
                                 <small class="text-muted">Maximum pair matches allowed per day</small>
                             </div>
+                            <hr class="my-2"><small class="text-muted font-weight-bold">Wallet Income Distribution (per purchase)</small>
+                            <div class="form-group mt-2">
+                                <label>Privilege Member Wallet (₹)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="editPrivilegeWallet" name="privilege_wallet_income" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Board Member Wallet (₹)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="editBoardWallet" name="board_wallet_income" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Executive Wallet (₹)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="editExecutiveWallet" name="executive_wallet_income" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Royalty Wallet (₹)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="editRoyaltyWallet" name="royalty_wallet_income" placeholder="0.00">
+                            </div>
                             <div class="form-group">
                                 <label>Status</label><br>
                                 <input type="radio" name="status" id="status_active" value="1"> Active
@@ -368,7 +423,7 @@
         </script>
     @endif
     <script>
-        function editPackage(id, name, amount, status, binaryCommission, sponsorCommission, dailyPairCap, eligibleIds, autoUpgradeCount, autoUpgradeTo, color) {
+        function editPackage(id, name, amount, status, binaryCommission, sponsorCommission, dailyPairCap, eligibleIds, autoUpgradeCount, autoUpgradeTo, color, privilegeWallet, boardWallet, executiveWallet, royaltyWallet) {
             $('#editPackageModal #packageId').val(id);
             $('#editPackageModal #editName').val(name);
             $('#editPackageModal #editAmount').val(amount);
@@ -378,6 +433,10 @@
             $('#editPackageModal #editAutoUpgradeCount').val(autoUpgradeCount || '');
             $('#editPackageModal #editAutoUpgradeTo').val(autoUpgradeTo || '');
             $('#editPackageModal #editColor').val(color || '#6c757d');
+            $('#editPackageModal #editPrivilegeWallet').val(privilegeWallet || 0);
+            $('#editPackageModal #editBoardWallet').val(boardWallet || 0);
+            $('#editPackageModal #editExecutiveWallet').val(executiveWallet || 0);
+            $('#editPackageModal #editRoyaltyWallet').val(royaltyWallet || 0);
             const sel = document.getElementById('editSponsorEligible');
             Array.from(sel.options).forEach(opt => {
                 opt.selected = eligibleIds.includes(parseInt(opt.value));

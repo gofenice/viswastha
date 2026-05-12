@@ -22,6 +22,10 @@ class Package extends Model
         'package_cat',
         'status',
         'color',
+        'privilege_wallet_income',
+        'board_wallet_income',
+        'executive_wallet_income',
+        'royalty_wallet_income',
     ];
 
     protected $casts = [
