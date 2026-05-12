@@ -61,9 +61,6 @@
                     <div class="card card-info card-outline h-100">
                         <div class="card-header">
                             <h6 class="card-title mb-0"><i class="fas fa-code-branch mr-2"></i>Binary Income</h6>
-                            <div class="card-tools">
-                                <span class="badge badge-info">From Daily Cron</span>
-                            </div>
                         </div>
                         <div class="card-body">
                             <div class="row text-center mb-3">
@@ -72,9 +69,8 @@
                                     <h4 class="font-weight-bold text-info">₹{{ number_format($binaryPairLifetime, 2) }}</h4>
                                 </div>
                                 <div class="col-6">
-                                    <p class="text-muted mb-1" style="font-size:11px;">COMBINED AVAILABLE</p>
+                                    <p class="text-muted mb-1" style="font-size:11px;">AVAILABLE</p>
                                     <h4 class="font-weight-bold text-success">₹{{ number_format($binaryWallet->balance, 2) }}</h4>
-                                    <small class="text-muted">(Binary + Sponsor)</small>
                                 </div>
                             </div>
                         </div>
@@ -102,9 +98,6 @@
                     <div class="card card-primary card-outline h-100">
                         <div class="card-header">
                             <h6 class="card-title mb-0"><i class="fas fa-user-friends mr-2"></i>Sponsor Income</h6>
-                            <div class="card-tools">
-                                <span class="badge badge-primary">From Package Purchase</span>
-                            </div>
                         </div>
                         <div class="card-body">
                             <div class="row text-center mb-3">
@@ -113,20 +106,26 @@
                                     <h4 class="font-weight-bold text-primary">₹{{ number_format($sponsorLifetime, 2) }}</h4>
                                 </div>
                                 <div class="col-6">
-                                    <p class="text-muted mb-1" style="font-size:11px;">WALLET</p>
-                                    <h4 class="font-weight-bold text-muted">Shared</h4>
-                                    <small class="text-muted">Combined with Binary</small>
+                                    <p class="text-muted mb-1" style="font-size:11px;">AVAILABLE</p>
+                                    <h4 class="font-weight-bold text-success">₹{{ number_format($binaryWallet->balance, 2) }}</h4>
                                 </div>
-                            </div>
-                            <div class="alert alert-light py-2 mb-0" style="font-size:12px;">
-                                <i class="fas fa-info-circle text-muted mr-1"></i>
-                                Sponsor & Binary income share one wallet. Use the Transfer button on the Binary card to move the combined balance.
                             </div>
                         </div>
                         <div class="card-footer bg-white">
+                            @if((float)$binaryWallet->balance > 0)
+                            <form action="{{ route('my_income.transfer') }}" method="POST">
+                                @csrf
+                                <input type="hidden" name="type" value="binary">
+                                <button type="submit" class="btn btn-primary btn-block btn-sm"
+                                    onclick="return confirm('Transfer ₹{{ number_format($binaryWallet->balance, 2) }} to your main wallet?')">
+                                    <i class="fas fa-arrow-right mr-1"></i> Transfer ₹{{ number_format($binaryWallet->balance, 2) }} to Main Wallet
+                                </button>
+                            </form>
+                            @else
                             <button class="btn btn-secondary btn-block btn-sm" disabled>
-                                <i class="fas fa-link mr-1"></i> Transfer via Binary Income Card
+                                <i class="fas fa-minus-circle mr-1"></i> No Balance to Transfer
                             </button>
+                            @endif
                         </div>
                     </div>
                 </div>
