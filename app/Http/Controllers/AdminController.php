@@ -2274,23 +2274,16 @@ class AdminController extends Controller
     private function royaltyIncomeAdd($userId, $package_id)
     {
         $package = Package::find($package_id);
+        $amount  = (float) ($package->royalty_wallet_income ?? 0);
 
-        if ($package->package_code === 'basic_package') {
-            $amount = 10;
-        } elseif ($package->package_code === 'premium_package' && $package->package_cat === 0) {
-            $amount = 50;
-        } elseif ($package->package_code === 'premium_package' && $package->package_cat === 1) {
-            $amount = 100;
-        } else {
-            return; // Package has no royalty income configured
-        }
+        if ($amount <= 0) return;
 
         RoyaltyIncomeWallet::create([
-            'user_id' => $userId,
-            'package_id' => $package_id,
-            'amount' => $amount,
+            'user_id'     => $userId,
+            'package_id'  => $package_id,
+            'amount'      => $amount,
             'is_redeemed' => 0,
-            'status' => 0,
+            'status'      => 0,
         ]);
     }
 
@@ -4696,17 +4689,16 @@ class AdminController extends Controller
     private function privilegeIncomeAdd($userId, $package_id)
     {
         $package = Package::find($package_id);
+        $amount  = (float) ($package->privilege_wallet_income ?? 0);
 
-        if ($package->package_code === 'premium_package' && $package->package_cat === 1) {
-            $amount = 50;
-        }
+        if ($amount <= 0) return;
 
         PrivilegeIncomeWallet::create([
-            'user_id' => $userId,
-            'package_id' => $package_id,
-            'amount' => $amount,
+            'user_id'     => $userId,
+            'package_id'  => $package_id,
+            'amount'      => $amount,
             'is_redeemed' => 0,
-            'status' => 0,
+            'status'      => 0,
         ]);
     }
 
@@ -4839,17 +4831,16 @@ class AdminController extends Controller
     private function boardIncomeAdd($userId, $package_id)
     {
         $package = Package::find($package_id);
+        $amount  = (float) ($package->board_wallet_income ?? 0);
 
-        if ($package->package_code === 'premium_package' && $package->package_cat === 1) {
-            $amount = 50;
-        }
+        if ($amount <= 0) return;
 
         BoardIncomeWallet::create([
-            'user_id' => $userId,
-            'package_id' => $package_id,
-            'amount' => $amount,
+            'user_id'     => $userId,
+            'package_id'  => $package_id,
+            'amount'      => $amount,
             'is_redeemed' => 0,
-            'status' => 0,
+            'status'      => 0,
         ]);
     }
 
@@ -4982,10 +4973,9 @@ class AdminController extends Controller
     private function executiveIncomeAdd($userId, $package_id)
     {
         $package = Package::find($package_id);
+        $amount  = (float) ($package->executive_wallet_income ?? 0);
 
-        if ($package->package_code === 'premium_package' && $package->package_cat === 1) {
-            $amount = 50;
-        }
+        if ($amount <= 0) return;
 
         ExecutiveIncomeWallet::create([
             'user_id'     => $userId,
