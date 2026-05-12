@@ -2906,6 +2906,7 @@ class AdminController extends Controller
         $user   = auth()->user();
         $userId = $user->id;
 
+        $myWallet           = \App\Models\UserNewWallet::forUser($userId);
         $binaryWallet       = \App\Models\BinaryWallet::forUser($userId);
         $binaryPairLifetime = \App\Models\BinaryTransaction::where('user_id', $userId)->where('type', 'binary_pair')->sum('amount');
         $sponsorLifetime    = \App\Models\BinaryTransaction::where('user_id', $userId)->whereIn('type', ['binary_sponsor', 'prime_sponsor'])->sum('amount');
@@ -2927,13 +2928,24 @@ class AdminController extends Controller
             'royalty'   => RoyaltyIncomeUser::where('user_id', $userId)->where('status', 1)->exists(),
         ];
 
-        return view('Admin.my_income', compact('user', 'binaryWallet', 'binaryPairLifetime', 'sponsorLifetime', 'newIncomes', 'isMember'));
+        return view('Admin.my_income', compact('user', 'myWallet', 'binaryWallet', 'binaryPairLifetime', 'sponsorLifetime', 'newIncomes', 'isMember'));
     }
 
     public function myIncomeTransfer(Request $request)
     {
         $type   = $request->input('type');
         $userId = auth()->id();
+
+        if ($type === 'binary') {
+            $binaryWallet = \App\Models\BinaryWallet::forUser($userId);
+            $amount = (float) $binaryWallet->balance;
+            if ($amount <= 0) return back()->with('error', 'No Binary income balance to transfer.');
+            DB::transaction(function () use ($userId, $amount, $binaryWallet) {
+                $binaryWallet->debit($amount);
+                \App\Models\UserNewWallet::forUser($userId)->credit($amount);
+            });
+            return back()->with('success', '₹' . number_format($amount, 2) . ' from Binary & Sponsor wallet moved to My Wallet.');
+        }
 
         $validTypes = ['privilege', 'board', 'executive', 'royalty'];
         if (!in_array($type, $validTypes)) return back()->with('error', 'Invalid income type.');
@@ -2944,16 +2956,9 @@ class AdminController extends Controller
 
         DB::transaction(function () use ($userId, $amount, $type) {
             UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->whereNull('transferred_at')->update(['transferred_at' => now()]);
-            // Credit the new system wallet (binary_wallets), NOT the old sunflower total_income
-            \App\Models\BinaryWallet::forUser($userId)->credit($amount);
-            \App\Models\BinaryTransaction::create([
-                'user_id'     => $userId,
-                'type'        => 'admin_credit',
-                'amount'      => $amount,
-                'description' => ucfirst($type) . ' wallet transferred to My Wallet',
-            ]);
+            \App\Models\UserNewWallet::forUser($userId)->credit($amount);
         });
-        return back()->with('success', '₹' . number_format($amount, 2) . ' from ' . ucfirst($type) . ' wallet added to your new system wallet.');
+        return back()->with('success', '₹' . number_format($amount, 2) . ' from ' . ucfirst($type) . ' wallet moved to My Wallet.');
     }
 
     public function transferToWallet()
