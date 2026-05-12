@@ -19,22 +19,37 @@
     <section class="content">
         <div class="container-fluid">
 
+            @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show">
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+                {{ session('success') }}
+            </div>
+            @endif
+            @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show">
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+                {{ session('error') }}
+            </div>
+            @endif
+
             {{-- Summary Cards --}}
+            @php
+                $cards = [
+                    'privilege' => ['label' => 'Privilege Member Wallet', 'icon' => 'fas fa-star',      'color' => 'bg-purple'],
+                    'board'     => ['label' => 'Board Member Wallet',     'icon' => 'fas fa-users',     'color' => 'bg-warning'],
+                    'executive' => ['label' => 'Executive Wallet',        'icon' => 'fas fa-briefcase', 'color' => 'bg-info'],
+                    'royalty'   => ['label' => 'Royalty Wallet',          'icon' => 'fas fa-crown',     'color' => 'bg-success'],
+                ];
+            @endphp
             <div class="row mb-4">
-                @php
-                    $cards = [
-                        'privilege' => ['label' => 'Privilege Member Wallet', 'icon' => 'fas fa-star',      'color' => 'bg-purple'],
-                        'board'     => ['label' => 'Board Member Wallet',     'icon' => 'fas fa-users',     'color' => 'bg-warning'],
-                        'executive' => ['label' => 'Executive Wallet',        'icon' => 'fas fa-briefcase', 'color' => 'bg-info'],
-                        'royalty'   => ['label' => 'Royalty Wallet',          'icon' => 'fas fa-crown',     'color' => 'bg-success'],
-                    ];
-                @endphp
                 @foreach($cards as $type => $card)
                 <div class="col-lg-3 col-6">
                     <div class="small-box {{ $card['color'] }}">
                         <div class="inner">
                             <h4>₹{{ number_format($totals[$type] ?? 0, 2) }}</h4>
-                            <p>{{ $card['label'] }}</p>
+                            <p>{{ $card['label'] }}<br>
+                                <small>Admin Reserve: ₹{{ number_format($adminBalances[$type] ?? 0, 2) }}</small>
+                            </p>
                         </div>
                         <div class="icon"><i class="{{ $card['icon'] }}"></i></div>
                         <a href="#" onclick="showTab('{{ $type }}'); return false;" class="small-box-footer">
@@ -65,6 +80,30 @@
                     <div class="tab-content">
                         @foreach(['privilege','board','executive','royalty'] as $type)
                         <div class="tab-pane fade {{ $type === 'privilege' ? 'show active' : '' }}" id="tab-{{ $type }}">
+
+                            {{-- Distribute Action Bar --}}
+                            <div class="d-flex align-items-center justify-content-between mb-3 p-3 bg-light rounded border">
+                                <div>
+                                    <span class="font-weight-bold">Undistributed Pool:</span>
+                                    <span class="text-primary font-weight-bold ml-1">₹{{ number_format($totals[$type] ?? 0, 2) }}</span>
+                                    <span class="mx-2 text-muted">+</span>
+                                    <span class="font-weight-bold">Admin Reserve:</span>
+                                    <span class="text-warning font-weight-bold ml-1">₹{{ number_format($adminBalances[$type] ?? 0, 2) }}</span>
+                                    <span class="mx-2 text-muted">=</span>
+                                    <span class="font-weight-bold">Total Pool:</span>
+                                    <span class="text-success font-weight-bold ml-1">₹{{ number_format(($totals[$type] ?? 0) + ($adminBalances[$type] ?? 0), 2) }}</span>
+                                    <span class="text-muted ml-3">Active Members: <strong>{{ ($members[$type] ?? collect())->where('status', 1)->count() }}</strong></span>
+                                </div>
+                                <form action="{{ route('purchase_wallets.distribute') }}" method="POST" class="d-inline distribute-form">
+                                    @csrf
+                                    <input type="hidden" name="wallet_type" value="{{ $type }}">
+                                    <button type="submit" class="btn btn-success btn-sm distribute-btn"
+                                        onclick="return confirm('Distribute {{ ucfirst($type) }} wallet to all active members now?')">
+                                        <i class="fas fa-share-alt mr-1"></i> Distribute Now
+                                    </button>
+                                </form>
+                            </div>
+
                             <div class="row">
 
                                 {{-- LEFT: Members list --}}
@@ -106,17 +145,19 @@
                                     </table>
                                 </div>
 
-                                {{-- RIGHT: Purchase transaction entries --}}
+                                {{-- RIGHT: Purchase entries + distribution history --}}
                                 <div class="col-md-8">
+
+                                    {{-- Undistributed entries --}}
                                     <h6 class="font-weight-bold border-bottom pb-1 mb-2">
                                         <i class="fas fa-receipt mr-1"></i>
-                                        Purchase Entries
+                                        Pending Purchase Entries
                                         <span class="badge badge-secondary ml-1">{{ ($entries[$type] ?? collect())->count() }}</span>
-                                        <span class="float-right text-success font-weight-bold">
-                                            Total: ₹{{ number_format($totals[$type] ?? 0, 2) }}
+                                        <span class="float-right text-primary font-weight-bold">
+                                            Pool: ₹{{ number_format($totals[$type] ?? 0, 2) }}
                                         </span>
                                     </h6>
-                                    <div style="max-height:420px; overflow-y:auto;">
+                                    <div style="max-height:260px; overflow-y:auto;" class="mb-4">
                                         <table class="table table-sm table-bordered table-striped">
                                             <thead class="thead-dark" style="position:sticky;top:0;">
                                                 <tr>
@@ -140,7 +181,7 @@
                                                 </tr>
                                                 @empty
                                                 <tr>
-                                                    <td colspan="6" class="text-center text-muted">No entries yet.</td>
+                                                    <td colspan="6" class="text-center text-muted">No pending entries.</td>
                                                 </tr>
                                                 @endforelse
                                             </tbody>
@@ -155,8 +196,45 @@
                                             @endif
                                         </table>
                                     </div>
-                                </div>
 
+                                    {{-- Distribution history --}}
+                                    <h6 class="font-weight-bold border-bottom pb-1 mb-2">
+                                        <i class="fas fa-history mr-1"></i>
+                                        Recent Distributions
+                                        <span class="badge badge-info ml-1">Last 5</span>
+                                    </h6>
+                                    <div style="max-height:200px; overflow-y:auto;">
+                                        <table class="table table-sm table-bordered table-striped">
+                                            <thead class="thead-light" style="position:sticky;top:0;">
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Pool (₹)</th>
+                                                    <th>Users</th>
+                                                    <th>Per User (₹)</th>
+                                                    <th>Distributed (₹)</th>
+                                                    <th>Reserve (₹)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse($distributions[$type] ?? [] as $dist)
+                                                <tr>
+                                                    <td>{{ $dist->created_at->format('d-m-Y H:i') }}</td>
+                                                    <td>{{ number_format($dist->pool_amount, 2) }}</td>
+                                                    <td>{{ $dist->user_count }}</td>
+                                                    <td class="text-success font-weight-bold">{{ number_format($dist->per_user_amount, 2) }}</td>
+                                                    <td>{{ number_format($dist->total_distributed, 2) }}</td>
+                                                    <td class="text-warning">{{ number_format($dist->remainder, 2) }}</td>
+                                                </tr>
+                                                @empty
+                                                <tr>
+                                                    <td colspan="6" class="text-center text-muted">No distributions yet.</td>
+                                                </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                </div>
                             </div>
                         </div>
                         @endforeach

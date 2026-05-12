@@ -306,6 +306,7 @@ Route::middleware('auth')->group(function () {
 
     // Purchase Wallet (new — separate from sunflower model wallets)
     Route::get('/purchase-wallets', [AdminController::class, 'purchaseWallets'])->name('purchase_wallets');
+    Route::post('/purchase-wallets/distribute', [AdminController::class, 'distributeWallet'])->name('purchase_wallets.distribute');
 
     // Board Routes
     Route::get('/board_users', [AdminController::class, 'board_users'])->name('board_users');

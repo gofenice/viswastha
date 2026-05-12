@@ -68,6 +68,9 @@ use App\Models\UserRankHistory;
 use App\Models\WalletTransactionDetail;
 use App\Models\ShopReceipt;
 use App\Models\PurchaseWalletEntry;
+use App\Models\AdminWalletBalance;
+use App\Models\WalletDistribution;
+use App\Models\UserWalletCredit;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -676,11 +679,16 @@ class AdminController extends Controller
         $types = ['privilege', 'board', 'executive', 'royalty'];
 
         $totals = [];
+        $adminBalances = [];
+        $distributions = [];
         foreach ($types as $type) {
-            $totals[$type] = PurchaseWalletEntry::where('wallet_type', $type)->sum('amount');
+            $totals[$type]        = PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->sum('amount');
+            $adminBalances[$type] = AdminWalletBalance::getBalance($type);
+            $distributions[$type] = WalletDistribution::where('wallet_type', $type)->orderByDesc('id')->take(5)->get();
         }
 
         $entries = PurchaseWalletEntry::with(['user', 'package'])
+            ->whereNull('distributed_at')
             ->orderByDesc('id')
             ->get()
             ->groupBy('wallet_type');
@@ -692,7 +700,77 @@ class AdminController extends Controller
             'royalty'   => RoyaltyIncomeUser::with('user')->get(),
         ];
 
-        return view('Admin.purchase_wallets', compact('totals', 'entries', 'members'));
+        return view('Admin.purchase_wallets', compact('totals', 'entries', 'members', 'adminBalances', 'distributions'));
+    }
+
+    public function distributeWallet(Request $request)
+    {
+        $type = $request->input('wallet_type');
+        $validTypes = ['privilege', 'board', 'executive', 'royalty'];
+        if (!in_array($type, $validTypes)) {
+            return back()->with('error', 'Invalid wallet type.');
+        }
+
+        $memberModels = [
+            'privilege' => PrivilegeUser::where('status', 1)->pluck('user_id')->toArray(),
+            'board'     => BoardUser::where('status', 1)->pluck('user_id')->toArray(),
+            'executive' => ExecutiveUser::where('status', 1)->pluck('user_id')->toArray(),
+            'royalty'   => RoyaltyIncomeUser::where('status', 1)->pluck('user_id')->toArray(),
+        ];
+
+        $userIds   = $memberModels[$type];
+        $userCount = count($userIds);
+
+        if ($userCount === 0) {
+            return back()->with('error', "No active {$type} members to distribute to.");
+        }
+
+        $poolFromEntries = (float) PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->sum('amount');
+        $adminBalance    = AdminWalletBalance::getBalance($type);
+        $totalPool       = $poolFromEntries + $adminBalance;
+
+        if ($totalPool <= 0) {
+            return back()->with('error', "Nothing to distribute for {$type} wallet.");
+        }
+
+        $perUser         = floor($totalPool / $userCount);
+        $totalDistributed = $perUser * $userCount;
+        $remainder       = $totalPool - $totalDistributed;
+
+        if ($perUser <= 0) {
+            return back()->with('error', "Pool ₹{$totalPool} is too small to distribute among {$userCount} users.");
+        }
+
+        DB::transaction(function () use ($type, $totalPool, $userCount, $perUser, $totalDistributed, $remainder, $userIds) {
+            $dist = WalletDistribution::create([
+                'wallet_type'      => $type,
+                'pool_amount'      => $totalPool,
+                'user_count'       => $userCount,
+                'per_user_amount'  => $perUser,
+                'total_distributed'=> $totalDistributed,
+                'remainder'        => $remainder,
+            ]);
+
+            $now = now();
+            $credits = [];
+            foreach ($userIds as $uid) {
+                $credits[] = [
+                    'user_id'         => $uid,
+                    'distribution_id' => $dist->id,
+                    'wallet_type'     => $type,
+                    'amount'          => $perUser,
+                    'created_at'      => $now,
+                    'updated_at'      => $now,
+                ];
+            }
+            DB::table('user_wallet_credits')->insert($credits);
+
+            PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->update(['distributed_at' => $now]);
+
+            AdminWalletBalance::setBalance($type, $remainder);
+        });
+
+        return back()->with('success', "Distributed ₹{$perUser} each to {$userCount} {$type} members. Remainder ₹{$remainder} kept in admin wallet.");
     }
 
     public function edit_profile(Request $request)
