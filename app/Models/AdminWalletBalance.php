@@ -24,12 +24,4 @@ class AdminWalletBalance extends Model
         static::where('wallet_type', $type)->increment('balance', $amount);
     }
 
-    public static function setBalance(string $type, float $amount): void
-    {
-        static::updateOrCreate(
-            ['wallet_type' => $type],
-            ['balance' => $amount]
-        );
-        static::where('wallet_type', $type)->update(['balance' => $amount]);
-    }
 }

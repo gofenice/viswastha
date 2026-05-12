@@ -69,6 +69,7 @@ use App\Models\WalletTransactionDetail;
 use App\Models\ShopReceipt;
 use App\Models\PurchaseWalletEntry;
 use App\Models\AdminWalletBalance;
+use App\Models\AdminWalletLedger;
 use App\Models\WalletDistribution;
 use App\Models\UserWalletCredit;
 use Illuminate\Support\Facades\File;
@@ -684,7 +685,7 @@ class AdminController extends Controller
         foreach ($types as $type) {
             $totals[$type]        = PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->sum('amount');
             $adminBalances[$type] = AdminWalletBalance::getBalance($type);
-            $distributions[$type] = WalletDistribution::where('wallet_type', $type)->orderByDesc('id')->take(5)->get();
+            $distributions[$type] = WalletDistribution::where('wallet_type', $type)->orderByDesc('id')->get();
         }
 
         $entries = PurchaseWalletEntry::with(['user', 'package'])
@@ -725,17 +726,16 @@ class AdminController extends Controller
             return back()->with('error', "No active {$type} members to distribute to.");
         }
 
-        $poolFromEntries = (float) PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->sum('amount');
-        $adminBalance    = AdminWalletBalance::getBalance($type);
-        $totalPool       = $poolFromEntries + $adminBalance;
+        // Pool = only undistributed purchase entries (admin balance is NOT reused)
+        $totalPool = (float) PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->sum('amount');
 
         if ($totalPool <= 0) {
             return back()->with('error', "Nothing to distribute for {$type} wallet.");
         }
 
-        $perUser         = floor($totalPool / $userCount);
+        $perUser          = floor($totalPool / $userCount);
         $totalDistributed = $perUser * $userCount;
-        $remainder       = $totalPool - $totalDistributed;
+        $remainder        = $totalPool - $totalDistributed;
 
         if ($perUser <= 0) {
             return back()->with('error', "Pool ₹{$totalPool} is too small to distribute among {$userCount} users.");
@@ -743,12 +743,12 @@ class AdminController extends Controller
 
         DB::transaction(function () use ($type, $totalPool, $userCount, $perUser, $totalDistributed, $remainder, $userIds) {
             $dist = WalletDistribution::create([
-                'wallet_type'      => $type,
-                'pool_amount'      => $totalPool,
-                'user_count'       => $userCount,
-                'per_user_amount'  => $perUser,
-                'total_distributed'=> $totalDistributed,
-                'remainder'        => $remainder,
+                'wallet_type'       => $type,
+                'pool_amount'       => $totalPool,
+                'user_count'        => $userCount,
+                'per_user_amount'   => $perUser,
+                'total_distributed' => $totalDistributed,
+                'remainder'         => $remainder,
             ]);
 
             $now = now();
@@ -767,10 +767,48 @@ class AdminController extends Controller
 
             PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->update(['distributed_at' => $now]);
 
-            AdminWalletBalance::setBalance($type, $remainder);
+            // Remainder accumulates in admin wallet (never reused in distributions)
+            if ($remainder > 0) {
+                AdminWalletBalance::addBalance($type, $remainder);
+                \App\Models\AdminWalletLedger::create([
+                    'wallet_type'     => $type,
+                    'amount'          => $remainder,
+                    'distribution_id' => $dist->id,
+                ]);
+            }
         });
 
-        return back()->with('success', "Distributed ₹{$perUser} each to {$userCount} {$type} members. Remainder ₹{$remainder} kept in admin wallet.");
+        return back()->with('success', "Distributed ₹{$perUser} each to {$userCount} {$type} members. Remainder ₹{$remainder} added to admin wallet.");
+    }
+
+    public function purchaseAdminWallet()
+    {
+        $types = ['privilege', 'board', 'executive', 'royalty'];
+        $balances = [];
+        foreach ($types as $type) {
+            $balances[$type] = AdminWalletBalance::getBalance($type);
+        }
+        $totalBalance = array_sum($balances);
+
+        $ledger = AdminWalletLedger::with('distribution')
+            ->orderByDesc('id')
+            ->get();
+
+        return view('Admin.admin_wallet', compact('balances', 'totalBalance', 'ledger'));
+    }
+
+    public function distributionRecipients($id)
+    {
+        $dist = WalletDistribution::findOrFail($id);
+        $credits = UserWalletCredit::with('user')->where('distribution_id', $id)->get();
+        return response()->json([
+            'distribution' => $dist,
+            'credits'      => $credits->map(fn($c) => [
+                'connection' => $c->user->connection ?? '—',
+                'name'       => $c->user->name ?? '—',
+                'amount'     => $c->amount,
+            ]),
+        ]);
     }
 
     public function edit_profile(Request $request)

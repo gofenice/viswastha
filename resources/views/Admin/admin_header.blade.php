@@ -365,6 +365,12 @@
                                 </a>
                             </li>
                             <li class="nav-item has-treeview">
+                                <a href="{{ route('admin_wallet') }}" class="nav-link">
+                                    <i class="nav-icon fas fa-piggy-bank"></i>
+                                    <p>Admin Wallet</p>
+                                </a>
+                            </li>
+                            <li class="nav-item has-treeview">
                                 <a href="{{ route('statement') }}" class="nav-link">
                                     <i class="nav-icon fas fa-university"></i>
                                     <p>
