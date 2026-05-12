@@ -784,9 +784,14 @@ class AdminController extends Controller
     public function purchaseAdminWallet()
     {
         $types = ['privilege', 'board', 'executive', 'royalty'];
+
+        // Always derive balances from ledger sum (single source of truth)
         $balances = [];
         foreach ($types as $type) {
-            $balances[$type] = AdminWalletBalance::getBalance($type);
+            $balances[$type] = (float) AdminWalletLedger::where('wallet_type', $type)->sum('amount');
+            // Keep admin_wallet_balances in sync
+            AdminWalletBalance::updateOrCreate(['wallet_type' => $type], ['balance' => $balances[$type]]);
+            AdminWalletBalance::where('wallet_type', $type)->update(['balance' => $balances[$type]]);
         }
         $totalBalance = array_sum($balances);
 
