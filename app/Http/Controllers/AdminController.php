@@ -1794,6 +1794,9 @@ class AdminController extends Controller
         } elseif ($package->package_code === 'basic_package' && $package->package_cat === 0) {
 
             $this->companyRankIncomeBasic($request->userid, $request->package_id);
+            $this->privilegeIncomeAdd($request->userid, $request->package_id);
+            $this->boardIncomeAdd($request->userid, $request->package_id);
+            $this->executiveIncomeAdd($request->userid, $request->package_id);
         } elseif ($package->package_code === 'premium_package' && $package->package_cat === 1) {
 
             $this->companyRankIncomeSuperPremium($request->userid, $request->package_id);
