@@ -57,6 +57,7 @@ use App\Models\PrivilegeUserWallet;
 use App\Models\ProductDeliveryDetail;
 use App\Models\RepurchaseWallet;
 use App\Models\RoyaltyIncomeWallet;
+use App\Models\RoyaltyIncomeUser;
 use App\Models\RoyaltyUserWallet;
 use App\Models\Shop;
 use App\Models\ShopCoupon;
@@ -684,7 +685,14 @@ class AdminController extends Controller
             ->get()
             ->groupBy('wallet_type');
 
-        return view('Admin.purchase_wallets', compact('totals', 'entries'));
+        $members = [
+            'privilege' => PrivilegeUser::with('user')->get(),
+            'board'     => BoardUser::with('user')->get(),
+            'executive' => ExecutiveUser::with('user')->get(),
+            'royalty'   => RoyaltyIncomeUser::with('user')->get(),
+        ];
+
+        return view('Admin.purchase_wallets', compact('totals', 'entries', 'members'));
     }
 
     public function edit_profile(Request $request)
