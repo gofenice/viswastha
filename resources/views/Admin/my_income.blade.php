@@ -32,22 +32,24 @@
             </div>
             @endif
 
-            {{-- ===== A WALLET (Main Wallet) ===== --}}
+            {{-- ===== MY WALLET (New System — separate from sunflower) ===== --}}
             <div class="row mb-4">
                 <div class="col-md-4">
                     <div class="card card-primary card-outline">
                         <div class="card-body text-center py-4">
                             <div class="mb-2"><i class="fas fa-wallet fa-2x text-primary"></i></div>
-                            <p class="text-muted mb-1 font-weight-bold text-uppercase" style="font-size:12px; letter-spacing:1px;">Main Wallet (A Wallet)</p>
-                            <h2 class="font-weight-bold text-primary mb-0">₹{{ number_format($user->total_income, 2) }}</h2>
-                            <small class="text-muted">Available for withdrawal</small>
+                            <p class="text-muted mb-1 font-weight-bold text-uppercase" style="font-size:12px; letter-spacing:1px;">My Wallet</p>
+                            <h2 class="font-weight-bold text-primary mb-0">₹{{ number_format($binaryWallet->balance, 2) }}</h2>
+                            <small class="text-muted">Available balance</small>
+                            <hr class="my-2">
+                            <small class="text-muted">Lifetime Earned: <strong class="text-dark">₹{{ number_format($binaryWallet->total_earned, 2) }}</strong></small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-8 d-flex align-items-center">
                     <div class="alert alert-info mb-0 w-100">
                         <i class="fas fa-info-circle mr-2"></i>
-                        Transfer income from any wallet below into your <strong>Main Wallet</strong>. Once transferred, it becomes available for withdrawal.
+                        This wallet is <strong>separate from your old income wallet</strong>. Binary and Sponsor income are credited here automatically. Transfer category income from the cards below into this wallet.
                     </div>
                 </div>
             </div>
@@ -61,34 +63,25 @@
                     <div class="card card-info card-outline h-100">
                         <div class="card-header">
                             <h6 class="card-title mb-0"><i class="fas fa-code-branch mr-2"></i>Binary Income</h6>
+                            <div class="card-tools">
+                                <span class="badge badge-success">Auto Credited</span>
+                            </div>
                         </div>
                         <div class="card-body">
-                            <div class="row text-center mb-3">
+                            <div class="row text-center">
                                 <div class="col-6 border-right">
                                     <p class="text-muted mb-1" style="font-size:11px;">LIFETIME EARNED</p>
                                     <h4 class="font-weight-bold text-info">₹{{ number_format($binaryPairLifetime, 2) }}</h4>
                                 </div>
                                 <div class="col-6">
-                                    <p class="text-muted mb-1" style="font-size:11px;">AVAILABLE</p>
-                                    <h4 class="font-weight-bold text-success">₹{{ number_format($binaryWallet->balance, 2) }}</h4>
+                                    <p class="text-muted mb-1" style="font-size:11px;">STATUS</p>
+                                    <h6 class="font-weight-bold text-success mt-1"><i class="fas fa-check-circle mr-1"></i>In My Wallet</h6>
+                                    <small class="text-muted">Credited automatically</small>
                                 </div>
                             </div>
                         </div>
-                        <div class="card-footer bg-white">
-                            @if((float)$binaryWallet->balance > 0)
-                            <form action="{{ route('my_income.transfer') }}" method="POST">
-                                @csrf
-                                <input type="hidden" name="type" value="binary">
-                                <button type="submit" class="btn btn-info btn-block btn-sm"
-                                    onclick="return confirm('Transfer ₹{{ number_format($binaryWallet->balance, 2) }} to your main wallet?')">
-                                    <i class="fas fa-arrow-right mr-1"></i> Transfer ₹{{ number_format($binaryWallet->balance, 2) }} to Main Wallet
-                                </button>
-                            </form>
-                            @else
-                            <button class="btn btn-secondary btn-block btn-sm" disabled>
-                                <i class="fas fa-minus-circle mr-1"></i> No Balance to Transfer
-                            </button>
-                            @endif
+                        <div class="card-footer bg-light text-center">
+                            <small class="text-muted"><i class="fas fa-info-circle mr-1"></i>Income is automatically credited to My Wallet above.</small>
                         </div>
                     </div>
                 </div>
@@ -98,48 +91,39 @@
                     <div class="card card-primary card-outline h-100">
                         <div class="card-header">
                             <h6 class="card-title mb-0"><i class="fas fa-user-friends mr-2"></i>Sponsor Income</h6>
+                            <div class="card-tools">
+                                <span class="badge badge-success">Auto Credited</span>
+                            </div>
                         </div>
                         <div class="card-body">
-                            <div class="row text-center mb-3">
+                            <div class="row text-center">
                                 <div class="col-6 border-right">
                                     <p class="text-muted mb-1" style="font-size:11px;">LIFETIME EARNED</p>
                                     <h4 class="font-weight-bold text-primary">₹{{ number_format($sponsorLifetime, 2) }}</h4>
                                 </div>
                                 <div class="col-6">
-                                    <p class="text-muted mb-1" style="font-size:11px;">AVAILABLE</p>
-                                    <h4 class="font-weight-bold text-success">₹{{ number_format($binaryWallet->balance, 2) }}</h4>
+                                    <p class="text-muted mb-1" style="font-size:11px;">STATUS</p>
+                                    <h6 class="font-weight-bold text-success mt-1"><i class="fas fa-check-circle mr-1"></i>In My Wallet</h6>
+                                    <small class="text-muted">Credited automatically</small>
                                 </div>
                             </div>
                         </div>
-                        <div class="card-footer bg-white">
-                            @if((float)$binaryWallet->balance > 0)
-                            <form action="{{ route('my_income.transfer') }}" method="POST">
-                                @csrf
-                                <input type="hidden" name="type" value="binary">
-                                <button type="submit" class="btn btn-primary btn-block btn-sm"
-                                    onclick="return confirm('Transfer ₹{{ number_format($binaryWallet->balance, 2) }} to your main wallet?')">
-                                    <i class="fas fa-arrow-right mr-1"></i> Transfer ₹{{ number_format($binaryWallet->balance, 2) }} to Main Wallet
-                                </button>
-                            </form>
-                            @else
-                            <button class="btn btn-secondary btn-block btn-sm" disabled>
-                                <i class="fas fa-minus-circle mr-1"></i> No Balance to Transfer
-                            </button>
-                            @endif
+                        <div class="card-footer bg-light text-center">
+                            <small class="text-muted"><i class="fas fa-info-circle mr-1"></i>Income is automatically credited to My Wallet above.</small>
                         </div>
                     </div>
                 </div>
 
             </div>
 
-            {{-- ===== 4 NEW INCOMES ===== --}}
+            {{-- ===== 4 CATEGORY WALLETS ===== --}}
             <h5 class="font-weight-bold mb-3 border-bottom pb-2"><i class="fas fa-layer-group mr-2 text-success"></i>Category Wallets</h5>
             @php
                 $categoryCards = [
-                    'privilege' => ['label' => 'Privilege Wallet',  'icon' => 'fas fa-star',      'color' => 'purple', 'badge_color' => 'badge-secondary'],
-                    'board'     => ['label' => 'Board Wallet',      'icon' => 'fas fa-users',     'color' => 'warning','badge_color' => 'badge-warning'],
-                    'executive' => ['label' => 'Executive Wallet',  'icon' => 'fas fa-briefcase', 'color' => 'info',   'badge_color' => 'badge-info'],
-                    'royalty'   => ['label' => 'Royalty Wallet',    'icon' => 'fas fa-crown',     'color' => 'success','badge_color' => 'badge-success'],
+                    'privilege' => ['label' => 'Privilege Wallet',  'icon' => 'fas fa-star',      'color' => 'purple', 'btn' => 'btn-secondary'],
+                    'board'     => ['label' => 'Board Wallet',      'icon' => 'fas fa-users',     'color' => 'warning','btn' => 'btn-warning'],
+                    'executive' => ['label' => 'Executive Wallet',  'icon' => 'fas fa-briefcase', 'color' => 'info',   'btn' => 'btn-info'],
+                    'royalty'   => ['label' => 'Royalty Wallet',    'icon' => 'fas fa-crown',     'color' => 'success','btn' => 'btn-success'],
                 ];
             @endphp
             <div class="row mb-4">
@@ -151,7 +135,7 @@
                     $history   = $newIncomes[$type]['history'];
                 @endphp
                 <div class="col-md-6 mb-3">
-                    <div class="card card-{{ $card['color'] }} card-outline h-100 {{ !$active ? 'opacity-60' : '' }}" style="{{ !$active ? 'opacity:0.6;' : '' }}">
+                    <div class="card card-{{ $card['color'] }} card-outline h-100" style="{{ !$active ? 'opacity:0.6;' : '' }}">
                         <div class="card-header">
                             <h6 class="card-title mb-0">
                                 <i class="{{ $card['icon'] }} mr-2"></i>{{ $card['label'] }}
@@ -162,14 +146,13 @@
                                 @else
                                     <span class="badge badge-secondary">Not a Member</span>
                                 @endif
-                                <span class="badge {{ $card['badge_color'] }} ml-1">Admin Distributed</span>
                             </div>
                         </div>
                         <div class="card-body">
                             <div class="row text-center mb-3">
                                 <div class="col-4 border-right">
                                     <p class="text-muted mb-1" style="font-size:11px;">AVAILABLE</p>
-                                    <h4 class="font-weight-bold {{ $active ? 'text-success' : 'text-muted' }}">
+                                    <h4 class="font-weight-bold {{ $active && $available > 0 ? 'text-success' : 'text-muted' }}">
                                         ₹{{ number_format($available, 2) }}
                                     </h4>
                                 </div>
@@ -197,7 +180,7 @@
                                             <td class="font-weight-bold">₹{{ number_format($credit->amount, 2) }}</td>
                                             <td>
                                                 @if($credit->transferred_at)
-                                                    <span class="badge badge-success" style="font-size:10px;">Transferred</span>
+                                                    <span class="badge badge-success" style="font-size:10px;">In My Wallet</span>
                                                 @else
                                                     <span class="badge badge-warning" style="font-size:10px;">Pending</span>
                                                 @endif
@@ -222,14 +205,14 @@
                             <form action="{{ route('my_income.transfer') }}" method="POST">
                                 @csrf
                                 <input type="hidden" name="type" value="{{ $type }}">
-                                <button type="submit" class="btn btn-success btn-block btn-sm"
-                                    onclick="return confirm('Transfer ₹{{ number_format($available, 2) }} from {{ ucfirst($type) }} wallet to your main wallet?')">
-                                    <i class="fas fa-arrow-right mr-1"></i> Transfer ₹{{ number_format($available, 2) }} to Main Wallet
+                                <button type="submit" class="btn {{ $card['btn'] }} btn-block btn-sm"
+                                    onclick="return confirm('Move ₹{{ number_format($available, 2) }} from {{ ucfirst($type) }} wallet to My Wallet?')">
+                                    <i class="fas fa-arrow-up mr-1"></i> Move ₹{{ number_format($available, 2) }} to My Wallet
                                 </button>
                             </form>
                             @elseif($active)
                             <button class="btn btn-secondary btn-block btn-sm" disabled>
-                                <i class="fas fa-minus-circle mr-1"></i> No Balance to Transfer
+                                <i class="fas fa-minus-circle mr-1"></i> No Balance Available
                             </button>
                             @else
                             <button class="btn btn-secondary btn-block btn-sm" disabled>

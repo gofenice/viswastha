@@ -2930,23 +2930,6 @@ class AdminController extends Controller
         $type   = $request->input('type');
         $userId = auth()->id();
 
-        if ($type === 'binary') {
-            $wallet = \App\Models\BinaryWallet::forUser($userId);
-            $amount = (float) $wallet->balance;
-            if ($amount <= 0) return back()->with('error', 'No binary wallet balance to transfer.');
-            DB::transaction(function () use ($userId, $amount, $wallet) {
-                $wallet->debit($amount);
-                User::where('id', $userId)->increment('total_income', $amount);
-                \App\Models\BinaryTransaction::create([
-                    'user_id'     => $userId,
-                    'type'        => 'withdrawal',
-                    'amount'      => $amount,
-                    'description' => 'Transferred to main wallet',
-                ]);
-            });
-            return back()->with('success', '₹' . number_format($amount, 2) . ' transferred to your main wallet.');
-        }
-
         $validTypes = ['privilege', 'board', 'executive', 'royalty'];
         if (!in_array($type, $validTypes)) return back()->with('error', 'Invalid income type.');
 
@@ -2954,11 +2937,18 @@ class AdminController extends Controller
         $amount  = (float) $credits->sum('amount');
         if ($amount <= 0) return back()->with('error', 'No ' . ucfirst($type) . ' income balance to transfer.');
 
-        DB::transaction(function () use ($userId, $amount, $credits, $type) {
+        DB::transaction(function () use ($userId, $amount, $type) {
             UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->whereNull('transferred_at')->update(['transferred_at' => now()]);
-            User::where('id', $userId)->increment('total_income', $amount);
+            // Credit the new system wallet (binary_wallets), NOT the old sunflower total_income
+            \App\Models\BinaryWallet::forUser($userId)->credit($amount);
+            \App\Models\BinaryTransaction::create([
+                'user_id'     => $userId,
+                'type'        => 'admin_credit',
+                'amount'      => $amount,
+                'description' => ucfirst($type) . ' wallet transferred to My Wallet',
+            ]);
         });
-        return back()->with('success', '₹' . number_format($amount, 2) . ' from ' . ucfirst($type) . ' wallet transferred to your main wallet.');
+        return back()->with('success', '₹' . number_format($amount, 2) . ' from ' . ucfirst($type) . ' wallet added to your new system wallet.');
     }
 
     public function transferToWallet()
