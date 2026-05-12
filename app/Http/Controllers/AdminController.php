@@ -3360,6 +3360,10 @@ class AdminController extends Controller
 
         $user = User::findOrFail($request->id);
 
+        // Capture original mother_id before any role reassignment so the
+        // new-Mother-ID promotion check below always sees the true original role.
+        $originalMotherId = $user->mother_id;
+
         // Block if the new PAN already belongs to another user with a different name.
         // If same name → same person joining an existing PAN group: auto-assign the next available role.
         $newPan        = strtoupper(trim($request->pan_card_no ?? ''));
@@ -3399,8 +3403,9 @@ class AdminController extends Controller
             }
         }
 
-        // If Mother ID and a new Mother ID picker was confirmed, promote that user
-        if ($user->mother_id == 1 && $request->filled('new_mother_id')) {
+        // If this user WAS a Mother ID and the admin picked a replacement,
+        // promote that replacement regardless of what role this user was just assigned above.
+        if ($originalMotherId == 1 && $request->filled('new_mother_id')) {
             $newMother = User::find((int) $request->new_mother_id);
             if ($newMother) {
                 $newMother->mother_id = 1;
