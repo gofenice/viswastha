@@ -677,22 +677,30 @@ class AdminController extends Controller
 
     public function purchaseWallets()
     {
-        $types = ['privilege', 'board', 'executive', 'royalty'];
+        // Admin wallet type codes: 25=privilege, 26=board, 27=executive, 28=royalty
+        $adminTypeMap = ['privilege' => 25, 'board' => 26, 'executive' => 27, 'royalty' => 28];
+        $incomeModels = [
+            'privilege' => PrivilegeIncomeWallet::class,
+            'board'     => BoardIncomeWallet::class,
+            'executive' => ExecutiveIncomeWallet::class,
+            'royalty'   => RoyaltyIncomeWallet::class,
+        ];
 
-        $totals = [];
+        $totals        = [];
         $adminBalances = [];
         $distributions = [];
-        foreach ($types as $type) {
-            $totals[$type]        = PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->sum('amount');
-            $adminBalances[$type] = AdminWalletBalance::getBalance($type);
+        foreach ($incomeModels as $type => $model) {
+            $totals[$type]        = $model::where('is_redeemed', 0)->sum('amount');
+            $adminBalances[$type] = AdminWallet::where('type', $adminTypeMap[$type])->sum('amount');
             $distributions[$type] = WalletDistribution::where('wallet_type', $type)->orderByDesc('id')->get();
         }
 
-        $entries = PurchaseWalletEntry::with(['user', 'package'])
-            ->whereNull('distributed_at')
-            ->orderByDesc('id')
-            ->get()
-            ->groupBy('wallet_type');
+        $entries = [
+            'privilege' => PrivilegeIncomeWallet::with(['user', 'package'])->where('is_redeemed', 0)->orderByDesc('id')->get(),
+            'board'     => BoardIncomeWallet::with(['user', 'package'])->where('is_redeemed', 0)->orderByDesc('id')->get(),
+            'executive' => ExecutiveIncomeWallet::with(['user', 'package'])->where('is_redeemed', 0)->orderByDesc('id')->get(),
+            'royalty'   => RoyaltyIncomeWallet::with(['user', 'package'])->where('is_redeemed', 0)->orderByDesc('id')->get(),
+        ];
 
         $members = [
             'privilege' => PrivilegeUser::with('user')->get(),
@@ -712,22 +720,35 @@ class AdminController extends Controller
             return back()->with('error', 'Invalid wallet type.');
         }
 
-        $memberModels = [
+        $incomeModels = [
+            'privilege' => PrivilegeIncomeWallet::class,
+            'board'     => BoardIncomeWallet::class,
+            'executive' => ExecutiveIncomeWallet::class,
+            'royalty'   => RoyaltyIncomeWallet::class,
+        ];
+        $userWalletTables = [
+            'privilege' => 'privilege_user_wallets',
+            'board'     => 'board_user_wallets',
+            'executive' => 'executive_user_wallets',
+            'royalty'   => 'royalty_user_wallets',
+        ];
+        $adminTypeMap = ['privilege' => 25, 'board' => 26, 'executive' => 27, 'royalty' => 28];
+
+        $memberIds = [
             'privilege' => PrivilegeUser::where('status', 1)->pluck('user_id')->toArray(),
             'board'     => BoardUser::where('status', 1)->pluck('user_id')->toArray(),
             'executive' => ExecutiveUser::where('status', 1)->pluck('user_id')->toArray(),
             'royalty'   => RoyaltyIncomeUser::where('status', 1)->pluck('user_id')->toArray(),
         ];
 
-        $userIds   = $memberModels[$type];
+        $userIds   = $memberIds[$type];
         $userCount = count($userIds);
 
         if ($userCount === 0) {
             return back()->with('error', "No active {$type} members to distribute to.");
         }
 
-        // Pool = only undistributed purchase entries (admin balance is NOT reused)
-        $totalPool = (float) PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->sum('amount');
+        $totalPool = (float) $incomeModels[$type]::where('is_redeemed', 0)->sum('amount');
 
         if ($totalPool <= 0) {
             return back()->with('error', "Nothing to distribute for {$type} wallet.");
@@ -741,7 +762,7 @@ class AdminController extends Controller
             return back()->with('error', "Pool ₹{$totalPool} is too small to distribute among {$userCount} users.");
         }
 
-        DB::transaction(function () use ($type, $totalPool, $userCount, $perUser, $totalDistributed, $remainder, $userIds) {
+        DB::transaction(function () use ($type, $totalPool, $userCount, $perUser, $totalDistributed, $remainder, $userIds, $incomeModels, $userWalletTables, $adminTypeMap) {
             $dist = WalletDistribution::create([
                 'wallet_type'       => $type,
                 'pool_amount'       => $totalPool,
@@ -751,29 +772,30 @@ class AdminController extends Controller
                 'remainder'         => $remainder,
             ]);
 
-            $now = now();
+            $now     = now();
             $credits = [];
             foreach ($userIds as $uid) {
                 $credits[] = [
-                    'user_id'         => $uid,
-                    'distribution_id' => $dist->id,
-                    'wallet_type'     => $type,
-                    'amount'          => $perUser,
-                    'created_at'      => $now,
-                    'updated_at'      => $now,
+                    'user_id'    => $uid,
+                    'amount'     => $perUser,
+                    'status'     => 1,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ];
             }
-            DB::table('user_wallet_credits')->insert($credits);
+            DB::table($userWalletTables[$type])->insert($credits);
 
-            PurchaseWalletEntry::where('wallet_type', $type)->whereNull('distributed_at')->update(['distributed_at' => $now]);
+            $incomeModels[$type]::where('is_redeemed', 0)->update(['is_redeemed' => 1]);
 
-            // Remainder accumulates in admin wallet (never reused in distributions)
             if ($remainder > 0) {
-                AdminWalletBalance::addBalance($type, $remainder);
-                \App\Models\AdminWalletLedger::create([
-                    'wallet_type'     => $type,
-                    'amount'          => $remainder,
-                    'distribution_id' => $dist->id,
+                AdminWallet::create([
+                    'admin_id'     => 1,
+                    'from_user_id' => null,
+                    'amount'       => $remainder,
+                    'type'         => $adminTypeMap[$type],
+                    'status'       => 0,
+                    'created_at'   => $now,
+                    'updated_at'   => $now,
                 ]);
             }
         });
@@ -783,21 +805,21 @@ class AdminController extends Controller
 
     public function purchaseAdminWallet()
     {
-        $types = ['privilege', 'board', 'executive', 'royalty'];
+        $adminTypeMap = ['privilege' => 25, 'board' => 26, 'executive' => 27, 'royalty' => 28];
 
-        // Always derive balances from ledger sum (single source of truth)
         $balances = [];
-        foreach ($types as $type) {
-            $balances[$type] = (float) AdminWalletLedger::where('wallet_type', $type)->sum('amount');
-            // Keep admin_wallet_balances in sync
-            AdminWalletBalance::updateOrCreate(['wallet_type' => $type], ['balance' => $balances[$type]]);
-            AdminWalletBalance::where('wallet_type', $type)->update(['balance' => $balances[$type]]);
+        foreach ($adminTypeMap as $type => $adminType) {
+            $balances[$type] = (float) AdminWallet::where('type', $adminType)->sum('amount');
         }
         $totalBalance = array_sum($balances);
 
-        $ledger = AdminWalletLedger::with('distribution')
+        $ledger = AdminWallet::whereIn('type', array_values($adminTypeMap))
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->map(function ($row) use ($adminTypeMap) {
+                $row->wallet_type = array_search($row->type, $adminTypeMap);
+                return $row;
+            });
 
         return view('Admin.admin_wallet', compact('balances', 'totalBalance', 'ledger'));
     }
@@ -2428,11 +2450,12 @@ class AdminController extends Controller
 
         if ($amount <= 0) return;
 
-        PurchaseWalletEntry::create([
+        RoyaltyIncomeWallet::create([
             'user_id'     => $userId,
             'package_id'  => $package_id,
-            'wallet_type' => 'royalty',
             'amount'      => $amount,
+            'is_redeemed' => 0,
+            'status'      => 0,
         ]);
     }
 
@@ -2906,18 +2929,23 @@ class AdminController extends Controller
         $user   = auth()->user();
         $userId = $user->id;
 
-        $myWallet           = \App\Models\UserNewWallet::forUser($userId);
         $binaryWallet       = \App\Models\BinaryWallet::forUser($userId);
         $binaryPairLifetime = \App\Models\BinaryTransaction::where('user_id', $userId)->where('type', 'binary_pair')->sum('amount');
         $sponsorLifetime    = \App\Models\BinaryTransaction::where('user_id', $userId)->whereIn('type', ['binary_sponsor', 'prime_sponsor'])->sum('amount');
 
-        $types = ['privilege', 'board', 'executive', 'royalty'];
+        $userWalletModels = [
+            'privilege' => PrivilegeUserWallet::class,
+            'board'     => BoardUserWallet::class,
+            'executive' => ExecutiveUserWallet::class,
+            'royalty'   => RoyaltyUserWallet::class,
+        ];
+
         $newIncomes = [];
-        foreach ($types as $type) {
+        foreach ($userWalletModels as $type => $model) {
             $newIncomes[$type] = [
-                'available' => UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->whereNull('transferred_at')->sum('amount'),
-                'lifetime'  => UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->sum('amount'),
-                'history'   => UserWalletCredit::with('distribution')->where('user_id', $userId)->where('wallet_type', $type)->orderByDesc('id')->get(),
+                'available' => $model::where('user_id', $userId)->where('status', 1)->sum('amount'),
+                'lifetime'  => $model::where('user_id', $userId)->sum('amount'),
+                'history'   => $model::where('user_id', $userId)->orderByDesc('id')->get(),
             ];
         }
 
@@ -2928,6 +2956,9 @@ class AdminController extends Controller
             'royalty'   => RoyaltyIncomeUser::where('user_id', $userId)->where('status', 1)->exists(),
         ];
 
+        // My Wallet = binary wallet balance (all 6 income types transfer here)
+        $myWallet = $binaryWallet;
+
         return view('Admin.my_income', compact('user', 'myWallet', 'binaryWallet', 'binaryPairLifetime', 'sponsorLifetime', 'newIncomes', 'isMember'));
     }
 
@@ -2936,28 +2967,34 @@ class AdminController extends Controller
         $type   = $request->input('type');
         $userId = auth()->id();
 
+        $userWalletTables = [
+            'privilege' => 'privilege_user_wallets',
+            'board'     => 'board_user_wallets',
+            'executive' => 'executive_user_wallets',
+            'royalty'   => 'royalty_user_wallets',
+        ];
+
+        $validTypes = ['binary', 'privilege', 'board', 'executive', 'royalty'];
+        if (!in_array($type, $validTypes)) return back()->with('error', 'Invalid income type.');
+
         if ($type === 'binary') {
             $binaryWallet = \App\Models\BinaryWallet::forUser($userId);
             $amount = (float) $binaryWallet->balance;
             if ($amount <= 0) return back()->with('error', 'No Binary income balance to transfer.');
             DB::transaction(function () use ($userId, $amount, $binaryWallet) {
                 $binaryWallet->debit($amount);
-                \App\Models\UserNewWallet::forUser($userId)->credit($amount);
+                $binaryWallet->increment('total_earned', 0); // balance already updated via debit
             });
             return back()->with('success', '₹' . number_format($amount, 2) . ' from Binary & Sponsor wallet moved to My Wallet.');
         }
 
-        $validTypes = ['privilege', 'board', 'executive', 'royalty'];
-        if (!in_array($type, $validTypes)) return back()->with('error', 'Invalid income type.');
-
-        $credits = UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->whereNull('transferred_at')->get();
-        $amount  = (float) $credits->sum('amount');
+        $amount = (float) DB::table($userWalletTables[$type])->where('user_id', $userId)->where('status', 1)->sum('amount');
         if ($amount <= 0) return back()->with('error', 'No ' . ucfirst($type) . ' income balance to transfer.');
 
-        DB::transaction(function () use ($userId, $amount, $type) {
-            UserWalletCredit::where('user_id', $userId)->where('wallet_type', $type)->whereNull('transferred_at')->update(['transferred_at' => now()]);
-            \App\Models\UserNewWallet::forUser($userId)->credit($amount);
+        DB::transaction(function () use ($userId, $type, $userWalletTables) {
+            DB::table($userWalletTables[$type])->where('user_id', $userId)->where('status', 1)->update(['status' => 0]);
         });
+
         return back()->with('success', '₹' . number_format($amount, 2) . ' from ' . ucfirst($type) . ' wallet moved to My Wallet.');
     }
 
@@ -4267,7 +4304,6 @@ class AdminController extends Controller
         }
 
 
-        $user->position = 'changed';
         $user->sponsor_id = $userSponsor->id;
         $user->save();
 
@@ -4902,11 +4938,12 @@ class AdminController extends Controller
 
         if ($amount <= 0) return;
 
-        PurchaseWalletEntry::create([
+        PrivilegeIncomeWallet::create([
             'user_id'     => $userId,
             'package_id'  => $package_id,
-            'wallet_type' => 'privilege',
             'amount'      => $amount,
+            'is_redeemed' => 0,
+            'status'      => 0,
         ]);
     }
 
@@ -5043,11 +5080,12 @@ class AdminController extends Controller
 
         if ($amount <= 0) return;
 
-        PurchaseWalletEntry::create([
+        BoardIncomeWallet::create([
             'user_id'     => $userId,
             'package_id'  => $package_id,
-            'wallet_type' => 'board',
             'amount'      => $amount,
+            'is_redeemed' => 0,
+            'status'      => 0,
         ]);
     }
 
@@ -5184,11 +5222,12 @@ class AdminController extends Controller
 
         if ($amount <= 0) return;
 
-        PurchaseWalletEntry::create([
+        ExecutiveIncomeWallet::create([
             'user_id'     => $userId,
             'package_id'  => $package_id,
-            'wallet_type' => 'executive',
             'amount'      => $amount,
+            'is_redeemed' => 0,
+            'status'      => 0,
         ]);
     }
 
@@ -7628,6 +7667,7 @@ class AdminController extends Controller
             while (!empty($frontier)) {
                 $children = DB::table('users')
                     ->whereIn('parent_id', $frontier)
+                    ->whereIn('position', ['left', 'right'])
                     ->whereNotIn('id', array_keys($visited))
                     ->pluck('id')
                     ->toArray();
@@ -7636,7 +7676,7 @@ class AdminController extends Controller
                 }
                 $frontier = $children;
             }
-            return count($visited) - 1; // exclude the root itself
+            return count($visited);
         };
 
         // ── 5. Leg volume helper (same CTE as before, just inlined per call) ──────
