@@ -3,8 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\BinaryPairLog;
-use App\Models\BinaryTransaction;
-use App\Models\BinaryWallet;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -267,47 +265,8 @@ class CalculateBinaryIncome extends Command
             ]);
 
             if ($income > 0) {
-                BinaryTransaction::credit(
-                    $userId,
-                    'binary_pair',
-                    $income,
-                    "Binary pair income — {$package->name} ({$capped} pairs × ₹{$rate})",
-                    [
-                        'package_id' => $package->id,
-                        'meta' => [
-                            'package'       => $package->name,
-                            'pairs'         => $capped,
-                            'rate'          => $rate,
-                            'total_left'    => $totalLeft,
-                            'total_right'   => $totalRight,
-                            'carry_forward' => max($carryOutLeft, $carryOutRight),
-                            'flushed'       => max($flushedLeft, $flushedRight),
-                        ],
-                    ]
-                );
+                User::where('id', $userId)->increment('total_income', $income);
             }
-
-            // Update wallet carry-forward display (sum across all packages)
-            $wallet = BinaryWallet::forUser($userId);
-            $wallet->carry_forward_left  = DB::table('binary_pair_logs')
-                ->where('user_id', $userId)
-                ->whereIn('id', function ($q) use ($userId) {
-                    $q->selectRaw('MAX(id)')
-                      ->from('binary_pair_logs')
-                      ->where('user_id', $userId)
-                      ->groupBy('package_id');
-                })
-                ->sum('carry_out_left');
-            $wallet->carry_forward_right = DB::table('binary_pair_logs')
-                ->where('user_id', $userId)
-                ->whereIn('id', function ($q) use ($userId) {
-                    $q->selectRaw('MAX(id)')
-                      ->from('binary_pair_logs')
-                      ->where('user_id', $userId)
-                      ->groupBy('package_id');
-                })
-                ->sum('carry_out_right');
-            $wallet->save();
         });
     }
 

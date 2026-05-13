@@ -2929,9 +2929,17 @@ class AdminController extends Controller
         $user   = auth()->user();
         $userId = $user->id;
 
-        $binaryWallet       = \App\Models\BinaryWallet::forUser($userId);
-        $binaryPairLifetime = \App\Models\BinaryTransaction::where('user_id', $userId)->where('type', 'binary_pair')->sum('amount');
-        $sponsorLifetime    = \App\Models\BinaryTransaction::where('user_id', $userId)->whereIn('type', ['binary_sponsor', 'prime_sponsor'])->sum('amount');
+        // Binary pair income history from cron logs
+        $binaryHistory   = DB::table('binary_pair_logs')
+            ->where('user_id', $userId)
+            ->where('income', '>', 0)
+            ->orderByDesc('id')
+            ->get();
+        $binaryLifetime  = $binaryHistory->sum('income');
+
+        // Sponsor income history from referral_incomes (status=0 means already credited to wallet)
+        $sponsorHistory  = ReferralIncome::where('sponsor_id', $userId)->orderByDesc('id')->get();
+        $sponsorLifetime = $sponsorHistory->sum('income');
 
         $userWalletModels = [
             'privilege' => PrivilegeUserWallet::class,
@@ -2956,10 +2964,7 @@ class AdminController extends Controller
             'royalty'   => RoyaltyIncomeUser::where('user_id', $userId)->where('status', 1)->exists(),
         ];
 
-        // My Wallet = binary wallet balance (all 6 income types transfer here)
-        $myWallet = $binaryWallet;
-
-        return view('Admin.my_income', compact('user', 'myWallet', 'binaryWallet', 'binaryPairLifetime', 'sponsorLifetime', 'newIncomes', 'isMember'));
+        return view('Admin.my_income', compact('user', 'binaryHistory', 'binaryLifetime', 'sponsorHistory', 'sponsorLifetime', 'newIncomes', 'isMember'));
     }
 
     public function myIncomeTransfer(Request $request)
@@ -2974,25 +2979,15 @@ class AdminController extends Controller
             'royalty'   => 'royalty_user_wallets',
         ];
 
-        $validTypes = ['binary', 'privilege', 'board', 'executive', 'royalty'];
+        $validTypes = ['privilege', 'board', 'executive', 'royalty'];
         if (!in_array($type, $validTypes)) return back()->with('error', 'Invalid income type.');
-
-        if ($type === 'binary') {
-            $binaryWallet = \App\Models\BinaryWallet::forUser($userId);
-            $amount = (float) $binaryWallet->balance;
-            if ($amount <= 0) return back()->with('error', 'No Binary income balance to transfer.');
-            DB::transaction(function () use ($userId, $amount, $binaryWallet) {
-                $binaryWallet->debit($amount);
-                $binaryWallet->increment('total_earned', 0); // balance already updated via debit
-            });
-            return back()->with('success', '₹' . number_format($amount, 2) . ' from Binary & Sponsor wallet moved to My Wallet.');
-        }
 
         $amount = (float) DB::table($userWalletTables[$type])->where('user_id', $userId)->where('status', 1)->sum('amount');
         if ($amount <= 0) return back()->with('error', 'No ' . ucfirst($type) . ' income balance to transfer.');
 
-        DB::transaction(function () use ($userId, $type, $userWalletTables) {
+        DB::transaction(function () use ($userId, $amount, $type, $userWalletTables) {
             DB::table($userWalletTables[$type])->where('user_id', $userId)->where('status', 1)->update(['status' => 0]);
+            User::where('id', $userId)->increment('total_income', $amount);
         });
 
         return back()->with('success', '₹' . number_format($amount, 2) . ' from ' . ucfirst($type) . ' wallet moved to My Wallet.');
@@ -7428,19 +7423,16 @@ class AdminController extends Controller
             ->exists();
         if (!$sponsorHasPackage) return;
 
-        $type  = in_array($package->package_code, ['prime_package']) ? 'prime_sponsor' : 'binary_sponsor';
-        $label = 'Sponsor commission — ' . $package->name . ' activated by ' . $activatedUser->name;
+        ReferralIncome::create([
+            'sponsor_id'       => $sponsorId,
+            'user_id'          => $activatedUserId,
+            'package_id'       => $packageId,
+            'package_category' => $package->package_code,
+            'income'           => $amount,
+            'status'           => '0',
+        ]);
 
-        \App\Models\BinaryTransaction::credit(
-            $sponsorId,
-            $type,
-            $amount,
-            $label,
-            [
-                'from_user_id' => $activatedUserId,
-                'package_id'   => $packageId,
-            ]
-        );
+        User::where('id', $sponsorId)->increment('total_income', $amount);
     }
 
     /**

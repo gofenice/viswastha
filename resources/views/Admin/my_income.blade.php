@@ -39,17 +39,9 @@
                         <div class="card-body text-center py-4">
                             <div class="mb-2"><i class="fas fa-wallet fa-2x text-primary"></i></div>
                             <p class="text-muted mb-1 font-weight-bold text-uppercase" style="font-size:12px; letter-spacing:1px;">My Wallet</p>
-                            <h2 class="font-weight-bold text-primary mb-0">₹{{ number_format($myWallet->balance, 2) }}</h2>
+                            <h2 class="font-weight-bold text-primary mb-0">₹{{ number_format($user->total_income, 2) }}</h2>
                             <small class="text-muted">Available balance</small>
-                            <hr class="my-2">
-                            <small class="text-muted">Lifetime Earned: <strong class="text-dark">₹{{ number_format($myWallet->total_earned, 2) }}</strong></small>
                         </div>
-                    </div>
-                </div>
-                <div class="col-md-8 d-flex align-items-center">
-                    <div class="alert alert-info mb-0 w-100">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        Transfer income from any wallet below into <strong>My Wallet</strong>. All 6 income types require a manual transfer.
                     </div>
                 </div>
             </div>
@@ -65,34 +57,39 @@
                             <h6 class="card-title mb-0"><i class="fas fa-code-branch mr-2"></i>Binary Income</h6>
                         </div>
                         <div class="card-body">
-                            <div class="row text-center mb-2">
+                            <div class="row text-center mb-3">
                                 <div class="col-6 border-right">
                                     <p class="text-muted mb-1" style="font-size:11px;">LIFETIME EARNED</p>
-                                    <h4 class="font-weight-bold text-info">₹{{ number_format($binaryPairLifetime, 2) }}</h4>
+                                    <h4 class="font-weight-bold text-info">₹{{ number_format($binaryLifetime, 2) }}</h4>
                                 </div>
                                 <div class="col-6">
-                                    <p class="text-muted mb-1" style="font-size:11px;">AVAILABLE</p>
-                                    <h4 class="font-weight-bold {{ (float)$binaryWallet->balance > 0 ? 'text-success' : 'text-muted' }}">
-                                        ₹{{ number_format($binaryWallet->balance, 2) }}
-                                    </h4>
+                                    <p class="text-muted mb-1" style="font-size:11px;">DISTRIBUTIONS</p>
+                                    <h4 class="font-weight-bold text-dark">{{ $binaryHistory->count() }}</h4>
                                 </div>
                             </div>
+                            @if($binaryHistory->isNotEmpty())
+                            <div style="max-height:160px; overflow-y:auto;">
+                                <table class="table table-xs table-bordered table-striped mb-0" style="font-size:12px;">
+                                    <thead class="thead-light">
+                                        <tr><th>Date</th><th>Pairs</th><th>Amount</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($binaryHistory as $log)
+                                        <tr>
+                                            <td>{{ \Carbon\Carbon::parse($log->created_at)->format('d-m-Y') }}</td>
+                                            <td>{{ $log->capped_pairs ?? '-' }}</td>
+                                            <td class="font-weight-bold">₹{{ number_format($log->income, 2) }}</td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            @else
+                                <p class="text-center text-muted mb-0" style="font-size:13px;">No binary income received yet.</p>
+                            @endif
                         </div>
                         <div class="card-footer bg-white">
-                            @if((float)$binaryWallet->balance > 0)
-                            <form action="{{ route('my_income.transfer') }}" method="POST">
-                                @csrf
-                                <input type="hidden" name="type" value="binary">
-                                <button type="submit" class="btn btn-info btn-block btn-sm"
-                                    onclick="return confirm('Move ₹{{ number_format($binaryWallet->balance, 2) }} to My Wallet?')">
-                                    <i class="fas fa-arrow-up mr-1"></i> Move ₹{{ number_format($binaryWallet->balance, 2) }} to My Wallet
-                                </button>
-                            </form>
-                            @else
-                            <button class="btn btn-secondary btn-block btn-sm" disabled>
-                                <i class="fas fa-minus-circle mr-1"></i> No Balance Available
-                            </button>
-                            @endif
+                            <small class="text-muted"><i class="fas fa-info-circle mr-1"></i>Credited directly to My Wallet after each daily run.</small>
                         </div>
                     </div>
                 </div>
@@ -104,34 +101,39 @@
                             <h6 class="card-title mb-0"><i class="fas fa-user-friends mr-2"></i>Sponsor Income</h6>
                         </div>
                         <div class="card-body">
-                            <div class="row text-center mb-2">
+                            <div class="row text-center mb-3">
                                 <div class="col-6 border-right">
                                     <p class="text-muted mb-1" style="font-size:11px;">LIFETIME EARNED</p>
                                     <h4 class="font-weight-bold text-primary">₹{{ number_format($sponsorLifetime, 2) }}</h4>
                                 </div>
                                 <div class="col-6">
-                                    <p class="text-muted mb-1" style="font-size:11px;">AVAILABLE</p>
-                                    <h4 class="font-weight-bold {{ (float)$binaryWallet->balance > 0 ? 'text-success' : 'text-muted' }}">
-                                        ₹{{ number_format($binaryWallet->balance, 2) }}
-                                    </h4>
+                                    <p class="text-muted mb-1" style="font-size:11px;">TOTAL ENTRIES</p>
+                                    <h4 class="font-weight-bold text-dark">{{ $sponsorHistory->count() }}</h4>
                                 </div>
                             </div>
+                            @if($sponsorHistory->isNotEmpty())
+                            <div style="max-height:160px; overflow-y:auto;">
+                                <table class="table table-xs table-bordered table-striped mb-0" style="font-size:12px;">
+                                    <thead class="thead-light">
+                                        <tr><th>Date</th><th>Package</th><th>Amount</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($sponsorHistory as $entry)
+                                        <tr>
+                                            <td>{{ \Carbon\Carbon::parse($entry->created_at)->format('d-m-Y') }}</td>
+                                            <td>{{ $entry->package_category ?? '-' }}</td>
+                                            <td class="font-weight-bold">₹{{ number_format($entry->income, 2) }}</td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            @else
+                                <p class="text-center text-muted mb-0" style="font-size:13px;">No sponsor income received yet.</p>
+                            @endif
                         </div>
                         <div class="card-footer bg-white">
-                            @if((float)$binaryWallet->balance > 0)
-                            <form action="{{ route('my_income.transfer') }}" method="POST">
-                                @csrf
-                                <input type="hidden" name="type" value="binary">
-                                <button type="submit" class="btn btn-primary btn-block btn-sm"
-                                    onclick="return confirm('Move ₹{{ number_format($binaryWallet->balance, 2) }} to My Wallet?')">
-                                    <i class="fas fa-arrow-up mr-1"></i> Move ₹{{ number_format($binaryWallet->balance, 2) }} to My Wallet
-                                </button>
-                            </form>
-                            @else
-                            <button class="btn btn-secondary btn-block btn-sm" disabled>
-                                <i class="fas fa-minus-circle mr-1"></i> No Balance Available
-                            </button>
-                            @endif
+                            <small class="text-muted"><i class="fas fa-info-circle mr-1"></i>Credited directly to My Wallet on package activation.</small>
                         </div>
                     </div>
                 </div>
@@ -200,7 +202,7 @@
                                             <td>{{ $credit->created_at->format('d-m-Y') }}</td>
                                             <td class="font-weight-bold">₹{{ number_format($credit->amount, 2) }}</td>
                                             <td>
-                                                @if($credit->transferred_at)
+                                                @if($credit->status == 0)
                                                     <span class="badge badge-success" style="font-size:10px;">In My Wallet</span>
                                                 @else
                                                     <span class="badge badge-warning" style="font-size:10px;">Pending</span>
