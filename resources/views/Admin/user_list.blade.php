@@ -115,6 +115,12 @@
                                         </button>
                                     @endif
                                     <br>
+                                    @if ($user->sponsor_id)
+                                        <button class="btn btn-primary btn-sm mt-2"
+                                            onclick="changesponsor({{ $user->id }})">
+                                            <i class="fas fa-edit">Change Sponsor</i>
+                                        </button>
+                                    @endif
                                     <button class="btn btn-secondary btn-sm mt-2" data-toggle="modal"
                                         data-target="#modal-change-password" onclick="changePassword({{ $user->id }})">
                                         <i class="fas fa-key"></i> Change Password
@@ -220,6 +226,49 @@
     </div>
 
 
+
+    <div class="modal fade" id="modal-lg-sponsor">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form id="sponsor-form" action="{{ route('change_sponsor') }}" method="POST">
+                    @csrf
+                    <div class="modal-header">
+                        <h4 class="modal-title">Change Sponsor</h4>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body row">
+                        <div class="form-group col-md-6">
+                            <label for="sponsorId" class="form-label">Current Sponsor Id</label>
+                            <input type="text" name="sponsorId" id="sponsorId" class="form-control" readonly>
+                            <span class="error-message text-danger"></span>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="sponsorName" class="form-label">Current Sponsor Name</label>
+                            <input type="text" name="sponsorName" id="sponsorName" class="form-control" readonly>
+                            <input type="hidden" name="user_id" id="user_id" class="form-control" required>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="sponsor_id" class="form-label">New Sponsor Id <span class="text-danger">*</span></label>
+                            <input type="text" name="sponsor_id" id="sponsor_id"
+                                oninput="this.value = this.value.toUpperCase()" placeholder="Enter new sponsor Id"
+                                class="form-control" required>
+                            <span class="error-message text-danger"></span>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="sponsor_name" class="form-label">New Sponsor Name</label>
+                            <input type="text" name="sponsor_name" id="sponsor_name" class="form-control" readonly>
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-between">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Change Sponsor</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="modal-change-password">
         <div class="modal-dialog">
@@ -675,6 +724,27 @@
                 },
                 error: function() {
                     Swal.fire('Error', 'An error occurred while fetching user details.', 'error');
+                }
+            });
+        }
+
+        function changesponsor(id) {
+            $.ajax({
+                url: '{{ route('getUserSponsor', ':id') }}'.replace(':id', id),
+                method: 'GET',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        const user = response.data;
+                        $('#user_id').val(user.user_id);
+                        $('#sponsorName').val(user.sponsorName);
+                        $('#sponsorId').val(user.sponsorId);
+                        $('#modal-lg-sponsor').modal('show');
+                    } else {
+                        Swal.fire('Error', response.message, 'error');
+                    }
+                },
+                error: function() {
+                    Swal.fire('Error', 'An error occurred while fetching sponsor details.', 'error');
                 }
             });
         }
