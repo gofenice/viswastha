@@ -85,7 +85,7 @@
 .pkg-ring {
     display: inline-block;
     border-radius: 50%;
-    padding: 4px;
+    padding: 8px;
     margin-bottom: 10px;
     line-height: 0;
 }
