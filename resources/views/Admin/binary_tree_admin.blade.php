@@ -495,11 +495,21 @@
                                 </div>
                                 <div class="form-group col-md-6">
                                     <label>Password <span class="text-danger">*</span></label>
-                                    <input type="password" name="password" class="form-control" required>
+                                    <div class="input-group">
+                                        <input type="password" name="password" id="regPassword" class="form-control" required>
+                                        <div class="input-group-append">
+                                            <span class="input-group-text" style="cursor:pointer;" onclick="togglePwd('regPassword', this)"><i class="fas fa-eye"></i></span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="form-group col-md-6">
                                     <label>Confirm Password <span class="text-danger">*</span></label>
-                                    <input type="password" name="password_confirmation" class="form-control" required>
+                                    <div class="input-group">
+                                        <input type="password" name="password_confirmation" id="regPasswordConfirm" class="form-control" required>
+                                        <div class="input-group-append">
+                                            <span class="input-group-text" style="cursor:pointer;" onclick="togglePwd('regPasswordConfirm', this)"><i class="fas fa-eye"></i></span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="form-group col-md-12">
                                     <label>Address <span class="text-danger">*</span></label>
@@ -1150,6 +1160,18 @@ $('#btnPlaceUser').on('click', function () {
 });
 
 // ── Node action: view subtree ─────────────────────────────────────────────────
+function togglePwd(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon  = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+
 function viewSubtree(e, userId) {
     e.stopPropagation();
     window.location.href = ROUTES.reload + '?node_id=' + userId;
