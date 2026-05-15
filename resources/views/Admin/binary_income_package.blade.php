@@ -21,30 +21,45 @@
         <div class="card-body">
             <table id="binaryIncomeTable" class="table table-bordered table-striped text-center">
                 <thead>
-                    <tr class="{{ $packageLabel === 'Basic' ? 'bg-info' : 'bg-success' }} text-white">
+                    <tr class="{{ $packageLabel === 'Basic' ? 'bg-info' : ($packageLabel === 'Prime' ? 'bg-warning' : 'bg-success') }} text-white">
                         <th>#</th>
-                        <th>From</th>
+                        <th>Name</th>
+                        <th>Connection ID</th>
                         <th>Package</th>
-                        <th>Type</th>
                         <th>Amount</th>
-                        <th>Date</th>
+                        <th>Side</th>
+                        <th>Activated On</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($incomes as $i => $row)
+                    @foreach($users as $i => $row)
                     <tr>
                         <td>{{ $i + 1 }}</td>
-                        <td>{{ $row->from }}</td>
-                        <td>{{ $row->package }}</td>
-                        <td>{{ $row->type }}</td>
+                        <td>{{ $row->name }}</td>
+                        <td>{{ $row->connection }}</td>
+                        <td>
+                            {{ $row->package_name }}
+                            @if(!empty($row->upgraded_from_package_id))
+                                <br><span class="badge badge-warning" style="font-size:0.7rem">2 Prime → Premium</span>
+                            @endif
+                        </td>
                         <td>₹{{ number_format($row->amount, 2) }}</td>
-                        <td>{{ \Carbon\Carbon::parse($row->date)->format('d M Y') }}</td>
+                        <td>
+                            @if($row->side === 'left')
+                                <span class="badge badge-primary">Left</span>
+                            @else
+                                <span class="badge badge-warning">Right</span>
+                            @endif
+                        </td>
+                        <td>{{ \Carbon\Carbon::parse($row->activated_at)->format('d M Y, h:i A') }}</td>
                     </tr>
                     @endforeach
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th colspan="6">Total {{ $packageLabel }} Income: ₹{{ number_format($total, 2) }}</th>
+                        <th colspan="4" class="text-right">Total Members: {{ count($users) }}</th>
+                        <th>₹{{ number_format(array_sum(array_column((array)$users, 'amount')), 2) }}</th>
+                        <th colspan="2"></th>
                     </tr>
                 </tfoot>
             </table>
@@ -54,7 +69,7 @@
 
 @section('scripts')
 <script>
-    $(function () { $('#binaryIncomeTable').DataTable(); });
+    $(function () { $('#binaryIncomeTable').DataTable({ order: [[6, 'desc']] }); });
 </script>
 @endsection
 

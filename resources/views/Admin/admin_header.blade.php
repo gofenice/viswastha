@@ -246,14 +246,6 @@
                                         <p>My Tree @if(!$migrationDone)<span class="badge badge-warning badge-sm ml-1">Migration</span>@endif</p>
                                     </a>
                                 </li>
-                                @if(!$migrationDone)
-                                <li class="nav-item">
-                                    <a href="{{ route('sunflower') }}" class="nav-link">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>My Team (Sunflower)</p>
-                                    </a>
-                                </li>
-                                @endif
                                 @endif
                                 @if(auth()->user()->role === 'admin' || auth()->user()->role === 'superadmin')
                                 <li class="nav-item">
@@ -395,6 +387,13 @@
                                         <p>Referral Incentive</p>
                                     </a>
                                 </li>
+                                @if(!in_array(auth()->user()->role, ['admin', 'superadmin']))
+                                <li class="nav-item">
+                                    <a href="{{ route('pair_details') }}" class="nav-link">
+                                        <i class="far fa-circle nav-icon text-danger"></i>
+                                        <p>Pair Details</p>
+                                    </a>
+                                </li>
                                 <li class="nav-item">
                                     <a href="{{ route('basic_binary_income') }}" class="nav-link">
                                         <i class="far fa-circle nav-icon text-info"></i>
@@ -407,6 +406,13 @@
                                         <p>Premium Binary Income</p>
                                     </a>
                                 </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('prime_binary_income') }}" class="nav-link">
+                                        <i class="far fa-circle nav-icon text-warning"></i>
+                                        <p>Prime Binary Income</p>
+                                    </a>
+                                </li>
+                                @endif
                                 <li class="nav-item">
                                     <a href="{{ route('rank_income_list') }}" class="nav-link rank">
                                         <i class="far fa-circle nav-icon"></i>

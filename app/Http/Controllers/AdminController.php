@@ -392,57 +392,63 @@ class AdminController extends Controller
             ]);
     }
 
+    public function pairDetails()
+    {
+        $logs = \App\Models\BinaryPairLog::where('user_id', auth()->id())
+            ->orderBy('calc_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $totalIncome = $logs->sum('income');
+
+        return view('Admin/pair_details', compact('logs', 'totalIncome'));
+    }
+
     public function basicBinaryIncome()
     {
-        $userId       = auth()->id();
-        $packageTypes = ['basic_package'];
-
-        return $this->packageBinaryIncome($userId, $packageTypes, 'Basic');
+        return $this->packageBinaryIncome(['basic_package'], 'Basic');
     }
 
     public function premiumBinaryIncome()
     {
-        $userId       = auth()->id();
-        $packageTypes = ['premium_package', 'prime_package'];
-
-        return $this->packageBinaryIncome($userId, $packageTypes, 'Premium');
+        return $this->packageBinaryIncome(['premium_package'], 'Premium');
     }
 
-    private function packageBinaryIncome(int $userId, array $packageTypes, string $packageLabel)
+    public function primeBinaryIncome()
     {
-        // Combine pair income and sponsor income into one flat list
-        $pairRows = \App\Models\BinaryPairLog::with('package')
-            ->where('user_id', $userId)
-            ->whereIn('package_type', $packageTypes)
-            ->where('income', '>', 0)
-            ->orderBy('calc_date', 'desc')
-            ->get()
-            ->map(fn($log) => (object)[
-                'from'    => '—',
-                'package' => $log->package->name ?? $log->package_type,
-                'type'    => 'Pair Income',
-                'amount'  => $log->income,
-                'date'    => $log->calc_date,
-            ]);
+        return $this->packageBinaryIncome(['prime_package'], 'Prime');
+    }
 
-        $sponsorRows = ReferralIncome::with(['user', 'package'])
-            ->where('sponsor_id', $userId)
-            ->whereIn('package_category', $packageTypes)
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn($tx) => (object)[
-                'from'    => ($tx->user->name ?? '-') . ' (' . ($tx->user->connection ?? '') . ')',
-                'package' => $tx->package->name ?? '-',
-                'type'    => $tx->package_category === 'prime_package'   ? 'Prime Sponsor'
-                           : ($tx->package_category === 'premium_package' ? 'Premium Sponsor' : 'Basic Sponsor'),
-                'amount'  => $tx->income,
-                'date'    => $tx->created_at,
-            ]);
+    private function packageBinaryIncome(array $packageTypes, string $packageLabel)
+    {
+        $userId       = auth()->id();
+        $placeholders = implode("','", $packageTypes);
 
-        $incomes   = $pairRows->concat($sponsorRows)->sortByDesc('date')->values();
-        $total     = $incomes->sum('amount');
+        $users = \DB::select("
+            WITH RECURSIVE subtree AS (
+                SELECT id, position AS side FROM users WHERE parent_id = ?
+                UNION ALL
+                SELECT u.id, s.side FROM users u INNER JOIN subtree s ON u.parent_id = s.id
+            )
+            SELECT u.name, u.connection, p.name AS package_name, p.package_code,
+                   CASE
+                       WHEN p.package_code = 'prime_package'
+                       THEN COALESCE(up2.binary_commission, 0) / p.auto_upgrade_count
+                       ELSE p.binary_commission
+                   END AS amount,
+                   up.created_at AS activated_at, s.side,
+                   up.upgraded_from_package_id
+            FROM user_packages up
+            JOIN packages p   ON p.id = up.package_id
+            JOIN users u      ON u.id = up.user_id
+            JOIN subtree s    ON s.id = up.user_id
+            LEFT JOIN packages up2 ON up2.id = p.auto_upgrade_to_package_id
+            WHERE up.status = 1
+              AND p.package_code IN ('{$placeholders}')
+            ORDER BY up.created_at DESC
+        ", [$userId]);
 
-        return view('Admin/binary_income_package', compact('incomes', 'total', 'packageLabel'));
+        return view('Admin/binary_income_package', compact('users', 'packageLabel'));
     }
 
     public function binaryIncomeUser()

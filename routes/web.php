@@ -66,8 +66,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/request_pin', [AdminController::class, 'request_pin'])->name('request_pin');
     Route::get('/pin_request_details', [AdminController::class, 'pin_request_details'])->name('pin_request_details');
     Route::get('/binary_income_details', [AdminController::class, 'binary_income_details'])->name('binary_income_details');
+    Route::get('/pair-details',           [AdminController::class, 'pairDetails'])->name('pair_details');
     Route::get('/basic-binary-income',   [AdminController::class, 'basicBinaryIncome'])->name('basic_binary_income');
     Route::get('/premium-binary-income', [AdminController::class, 'premiumBinaryIncome'])->name('premium_binary_income');
+    Route::get('/prime-binary-income',   [AdminController::class, 'primeBinaryIncome'])->name('prime_binary_income');
 
     // User binary tree
     Route::get('/my-tree', [AdminController::class, 'userBinaryTree'])->name('user.binary_tree');
