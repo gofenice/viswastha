@@ -394,51 +394,57 @@ class AdminController extends Controller
 
     public function basicBinaryIncome()
     {
-        $userId = auth()->id();
+        $userId       = auth()->id();
+        $packageTypes = ['basic_package'];
 
-        $pairLogs = \App\Models\BinaryPairLog::with('package')
-            ->where('user_id', $userId)
-            ->where('package_type', 'basic_package')
-            ->orderBy('calc_date', 'desc')
-            ->get();
-
-        $referralTransactions = ReferralIncome::with(['user', 'package'])
-            ->where('sponsor_id', $userId)
-            ->where('package_category', 'basic_package')
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        $pairIncomeTotal    = $pairLogs->sum('income');
-        $sponsorIncomeTotal = $referralTransactions->sum('income');
-        $packageLabel       = 'Basic';
-
-        return view('Admin/binary_income_package', compact(
-            'pairLogs', 'referralTransactions', 'pairIncomeTotal', 'sponsorIncomeTotal', 'packageLabel'
-        ));
+        return $this->packageBinaryIncome($userId, $packageTypes, 'Basic');
     }
 
     public function premiumBinaryIncome()
     {
-        $userId = auth()->id();
+        $userId       = auth()->id();
+        $packageTypes = ['premium_package', 'prime_package'];
 
+        return $this->packageBinaryIncome($userId, $packageTypes, 'Premium');
+    }
+
+    private function packageBinaryIncome(int $userId, array $packageTypes, string $packageLabel)
+    {
         $pairLogs = \App\Models\BinaryPairLog::with('package')
             ->where('user_id', $userId)
-            ->whereIn('package_type', ['premium_package', 'prime_package'])
+            ->whereIn('package_type', $packageTypes)
             ->orderBy('calc_date', 'desc')
             ->get();
 
         $referralTransactions = ReferralIncome::with(['user', 'package'])
             ->where('sponsor_id', $userId)
-            ->whereIn('package_category', ['premium_package', 'prime_package'])
+            ->whereIn('package_category', $packageTypes)
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Latest carry-forward per package for this user
+        $packageStatus = \DB::table('binary_pair_logs as bpl')
+            ->join('packages as p', 'p.id', '=', 'bpl.package_id')
+            ->whereIn('bpl.id', function ($q) use ($userId, $packageTypes) {
+                $q->selectRaw('MAX(id)')
+                  ->from('binary_pair_logs')
+                  ->where('user_id', $userId)
+                  ->whereIn('package_type', $packageTypes)
+                  ->groupBy('package_id');
+            })
+            ->select('p.name as package_name', 'bpl.carry_out_left', 'bpl.carry_out_right',
+                     'bpl.capped_pairs', 'bpl.income as last_income', 'bpl.created_at as last_run')
+            ->get();
+
+        // Wallet summary for this user
+        $walletSummary = \DB::table('binary_wallets')->where('user_id', $userId)->first();
+
         $pairIncomeTotal    = $pairLogs->sum('income');
         $sponsorIncomeTotal = $referralTransactions->sum('income');
-        $packageLabel       = 'Premium';
 
         return view('Admin/binary_income_package', compact(
-            'pairLogs', 'referralTransactions', 'pairIncomeTotal', 'sponsorIncomeTotal', 'packageLabel'
+            'pairLogs', 'referralTransactions', 'packageStatus', 'walletSummary',
+            'pairIncomeTotal', 'sponsorIncomeTotal', 'packageLabel'
         ));
     }
 
