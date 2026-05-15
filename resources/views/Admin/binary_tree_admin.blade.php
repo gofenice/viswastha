@@ -76,7 +76,7 @@
     height: 132px;
     border-radius: 50%;
     object-fit: cover;
-    border: 4px solid #007bff;
+    border: 4px solid #adb5bd;
     margin-bottom: 10px;
 }
 .root-node .node-img { border-color: #fd7e14; }
