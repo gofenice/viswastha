@@ -1091,8 +1091,18 @@ $('#btnPlaceUser').on('click', function () {
             success: function (res) {
                 try { res = typeof res === 'string' ? JSON.parse(res) : res; } catch(e) {}
                 if (res.status === 'success') {
-                    Swal.fire('Added!', 'New user created. Points calculated.', 'success').then(function () {
-                        $('#placeUserModal').modal('hide');
+                    $('#placeUserModal').modal('hide');
+                    Swal.fire({
+                        title: 'User Created!',
+                        html:
+                            '<div class="text-left mt-2">' +
+                            '<p><strong>User ID:</strong> <span class="text-primary" style="font-size:1.1em;">' + res.connection + '</span></p>' +
+                            '<p><strong>Password:</strong> <span class="text-danger" style="font-size:1.1em;">' + res.password + '</span></p>' +
+                            '</div>',
+                        icon: 'success',
+                        confirmButtonText: 'Close',
+                        allowOutsideClick: false
+                    }).then(function () {
                         reloadPage();
                     });
                 } else if (res.status === 'validation') {
