@@ -335,9 +335,15 @@ class AdminController extends Controller
                 INNER JOIN subtree s ON u.parent_id = s.id
             )
             SELECT u.id, u.name, u.connection, p.name AS package_name,
-                   p.binary_commission AS bv, up.created_at AS activated_at
+                   CASE
+                       WHEN p.auto_upgrade_to_package_id IS NOT NULL AND p.auto_upgrade_count > 0
+                       THEN COALESCE(up2.binary_commission, 0) / p.auto_upgrade_count
+                       ELSE p.binary_commission
+                   END AS bv,
+                   up.created_at AS activated_at
             FROM user_packages up
             JOIN packages p ON p.id = up.package_id
+            LEFT JOIN packages up2 ON up2.id = p.auto_upgrade_to_package_id
             JOIN users u    ON u.id = up.user_id
             WHERE up.user_id IN (SELECT id FROM subtree)
               AND up.status = 1
@@ -7667,7 +7673,9 @@ class AdminController extends Controller
             return count($visited);
         };
 
-        // ── 5. Leg volume helper (same CTE as before, just inlined per call) ──────
+        // ── 5. Leg volume helper — uses effective BV for auto-upgrade packages ──────
+        // For packages like Prime (binary_commission=0, auto_upgrade_to Premium),
+        // each active prime contributes upgrade_pkg.binary_commission / auto_upgrade_count.
         $legVolume = function (int $childId, string $pkgCode): float {
             $result = DB::select("
                 WITH RECURSIVE sub AS (
@@ -7675,9 +7683,16 @@ class AdminController extends Controller
                     UNION ALL
                     SELECT u.id FROM users u INNER JOIN sub s ON u.parent_id = s.id
                 )
-                SELECT COALESCE(SUM(p.binary_commission), 0) AS total
+                SELECT COALESCE(SUM(
+                    CASE
+                        WHEN p.auto_upgrade_to_package_id IS NOT NULL AND p.auto_upgrade_count > 0
+                        THEN COALESCE(up2.binary_commission, 0) / p.auto_upgrade_count
+                        ELSE p.binary_commission
+                    END
+                ), 0) AS total
                 FROM user_packages up
                 JOIN packages p ON p.id = up.package_id
+                LEFT JOIN packages up2 ON up2.id = p.auto_upgrade_to_package_id
                 WHERE up.user_id IN (SELECT id FROM sub)
                   AND up.status = 1
                   AND up.created_at >= ?
@@ -7700,11 +7715,16 @@ class AdminController extends Controller
 
             $hasBasic   = in_array('basic_package',   $codes);
             $hasPremium = in_array('premium_package', $codes);
+            $hasPrime   = in_array('prime_package',   $codes);
 
-            $node->left_basic_vol    = ($hasBasic   && $leftChildId)  ? $legVolume($leftChildId,  'basic_package')   : 0;
-            $node->right_basic_vol   = ($hasBasic   && $rightChildId) ? $legVolume($rightChildId, 'basic_package')   : 0;
-            $node->left_premium_vol  = ($hasPremium && $leftChildId)  ? $legVolume($leftChildId,  'premium_package') : 0;
-            $node->right_premium_vol = ($hasPremium && $rightChildId) ? $legVolume($rightChildId, 'premium_package') : 0;
+            $node->left_basic_vol    = ($hasBasic && $leftChildId)  ? $legVolume($leftChildId,  'basic_package') : 0;
+            $node->right_basic_vol   = ($hasBasic && $rightChildId) ? $legVolume($rightChildId, 'basic_package') : 0;
+
+            // PSV includes both premium and effective prime contributions (prime = upgrade_bv / count)
+            $node->left_premium_vol  = (($hasPremium || $hasPrime) && $leftChildId)
+                ? $legVolume($leftChildId,  'premium_package') + $legVolume($leftChildId,  'prime_package') : 0;
+            $node->right_premium_vol = (($hasPremium || $hasPrime) && $rightChildId)
+                ? $legVolume($rightChildId, 'premium_package') + $legVolume($rightChildId, 'prime_package') : 0;
 
             $node->package_color = $topPkg ? ($topPkg->color ?: '#6c757d') : null;
 
