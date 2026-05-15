@@ -396,18 +396,6 @@
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="{{ route('levelincomelistbasic') }}" class="nav-link basiclevel">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Basic Level Incentive</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="{{ route('levelincomelist') }}" class="nav-link match">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Premium Level Incentive</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
                                     <a href="{{ route('rank_income_list') }}" class="nav-link rank">
                                         <i class="far fa-circle nav-icon"></i>
                                         <p>Premium Rank Incentive</p>
