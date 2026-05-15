@@ -392,6 +392,62 @@ class AdminController extends Controller
             ]);
     }
 
+    public function basicBinaryIncome()
+    {
+        if (!\App\Models\BinaryTreeSetting::current()->migration_complete) {
+            abort(403, 'Binary income is not available yet.');
+        }
+        $userId = auth()->id();
+
+        $pairLogs = \App\Models\BinaryPairLog::with('package')
+            ->where('user_id', $userId)
+            ->where('package_type', 'basic_package')
+            ->orderBy('calc_date', 'desc')
+            ->get();
+
+        $referralTransactions = ReferralIncome::with(['user', 'package'])
+            ->where('sponsor_id', $userId)
+            ->where('package_category', 'basic_package')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $pairIncomeTotal    = $pairLogs->sum('income');
+        $sponsorIncomeTotal = $referralTransactions->sum('income');
+        $packageLabel       = 'Basic';
+
+        return view('Admin/binary_income_package', compact(
+            'pairLogs', 'referralTransactions', 'pairIncomeTotal', 'sponsorIncomeTotal', 'packageLabel'
+        ));
+    }
+
+    public function premiumBinaryIncome()
+    {
+        if (!\App\Models\BinaryTreeSetting::current()->migration_complete) {
+            abort(403, 'Binary income is not available yet.');
+        }
+        $userId = auth()->id();
+
+        $pairLogs = \App\Models\BinaryPairLog::with('package')
+            ->where('user_id', $userId)
+            ->whereIn('package_type', ['premium_package', 'prime_package'])
+            ->orderBy('calc_date', 'desc')
+            ->get();
+
+        $referralTransactions = ReferralIncome::with(['user', 'package'])
+            ->where('sponsor_id', $userId)
+            ->whereIn('package_category', ['premium_package', 'prime_package'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $pairIncomeTotal    = $pairLogs->sum('income');
+        $sponsorIncomeTotal = $referralTransactions->sum('income');
+        $packageLabel       = 'Premium';
+
+        return view('Admin/binary_income_package', compact(
+            'pairLogs', 'referralTransactions', 'pairIncomeTotal', 'sponsorIncomeTotal', 'packageLabel'
+        ));
+    }
+
     public function binaryIncomeUser()
     {
         if (!\App\Models\BinaryTreeSetting::current()->migration_complete) {

@@ -396,6 +396,18 @@
                                     </a>
                                 </li>
                                 <li class="nav-item">
+                                    <a href="{{ route('basic_binary_income') }}" class="nav-link">
+                                        <i class="far fa-circle nav-icon text-info"></i>
+                                        <p>Basic Binary Income</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('premium_binary_income') }}" class="nav-link">
+                                        <i class="far fa-circle nav-icon text-success"></i>
+                                        <p>Premium Binary Income</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a href="{{ route('rank_income_list') }}" class="nav-link rank">
                                         <i class="far fa-circle nav-icon"></i>
                                         <p>Premium Rank Incentive</p>
