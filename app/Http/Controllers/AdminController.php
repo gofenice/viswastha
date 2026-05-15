@@ -394,9 +394,6 @@ class AdminController extends Controller
 
     public function basicBinaryIncome()
     {
-        if (!\App\Models\BinaryTreeSetting::current()->migration_complete) {
-            abort(403, 'Binary income is not available yet.');
-        }
         $userId = auth()->id();
 
         $pairLogs = \App\Models\BinaryPairLog::with('package')
@@ -422,9 +419,6 @@ class AdminController extends Controller
 
     public function premiumBinaryIncome()
     {
-        if (!\App\Models\BinaryTreeSetting::current()->migration_complete) {
-            abort(403, 'Binary income is not available yet.');
-        }
         $userId = auth()->id();
 
         $pairLogs = \App\Models\BinaryPairLog::with('package')
