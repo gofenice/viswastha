@@ -20,19 +20,9 @@
     <section class="content">
         <div class="container-fluid">
 
-            {{-- Wallet summary --}}
-            @if($wallet)
+            {{-- Income summary --}}
             <div class="row mb-3">
-                <div class="col-md-3">
-                    <div class="info-box bg-success">
-                        <span class="info-box-icon"><i class="fas fa-wallet"></i></span>
-                        <div class="info-box-content">
-                            <span class="info-box-text">Available Balance</span>
-                            <span class="info-box-number">₹{{ number_format($wallet->balance, 2) }}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
+                <div class="col-md-6">
                     <div class="info-box bg-primary">
                         <span class="info-box-icon"><i class="fas fa-handshake"></i></span>
                         <div class="info-box-content">
@@ -41,7 +31,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-6">
                     <div class="info-box bg-info">
                         <span class="info-box-icon"><i class="fas fa-user-plus"></i></span>
                         <div class="info-box-content">
@@ -50,17 +40,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="info-box bg-warning">
-                        <span class="info-box-icon"><i class="fas fa-arrow-up"></i></span>
-                        <div class="info-box-content">
-                            <span class="info-box-text">Total Withdrawn</span>
-                            <span class="info-box-number">₹{{ number_format($wallet->total_withdrawn, 2) }}</span>
-                        </div>
-                    </div>
-                </div>
             </div>
-            @endif
 
             {{-- Notice --}}
             <div class="alert alert-info">
@@ -138,7 +118,7 @@
                 <div class="card-header">
                     <h3 class="card-title">Referral Income (All-Time)</h3>
                     <div class="card-tools">
-                        <span class="badge badge-success">Total ₹{{ number_format($referralTransactions->sum('amount'), 2) }}</span>
+                        <span class="badge badge-success">Total ₹{{ number_format($referralTransactions->sum('income'), 2) }}</span>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -147,7 +127,9 @@
                             <tr>
                                 <th>#</th>
                                 <th>Date</th>
-                                <th>Description</th>
+                                <th>From (Activated By)</th>
+                                <th>Package</th>
+                                <th>Type</th>
                                 <th>Amount (₹)</th>
                             </tr>
                         </thead>
@@ -156,11 +138,24 @@
                             <tr>
                                 <td>{{ $i + 1 }}</td>
                                 <td>{{ $tx->created_at->format('d M Y') }}</td>
-                                <td>{{ $tx->description }}</td>
-                                <td class="text-success font-weight-bold">₹{{ number_format($tx->amount, 2) }}</td>
+                                <td>
+                                    {{ $tx->user->name ?? '-' }}<br>
+                                    <small class="text-muted">{{ $tx->user->connection ?? '' }}</small>
+                                </td>
+                                <td>{{ $tx->package->name ?? '-' }}</td>
+                                <td>
+                                    @if($tx->package_category === 'prime_package')
+                                        <span class="badge badge-warning">Prime Sponsor</span>
+                                    @elseif($tx->package_category === 'premium_package')
+                                        <span class="badge badge-success">Premium Sponsor</span>
+                                    @else
+                                        <span class="badge badge-info">Basic Sponsor</span>
+                                    @endif
+                                </td>
+                                <td class="text-success font-weight-bold">₹{{ number_format($tx->income, 2) }}</td>
                             </tr>
                             @empty
-                            <tr><td colspan="4" class="text-center text-muted">No referral income yet.</td></tr>
+                            <tr><td colspan="6" class="text-center text-muted">No referral income yet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

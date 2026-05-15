@@ -57,23 +57,25 @@
                                     <td>{{ $index + 1 }}</td>
                                     @if(Auth::check() && Auth::user()->role === 'superadmin')
                                         <td>
-                                            {{ $txn->user->name ?? '-' }}<br>
-                                            <small class="text-muted">{{ $txn->user->connection ?? '' }}</small>
+                                            {{ $txn->sponsor->name ?? '-' }}<br>
+                                            <small class="text-muted">{{ $txn->sponsor->connection ?? '' }}</small>
                                         </td>
                                     @endif
                                     <td>
-                                        {{ $txn->fromUser->name ?? '-' }}<br>
-                                        <small class="text-muted">{{ $txn->fromUser->connection ?? '' }}</small>
+                                        {{ $txn->user->name ?? '-' }}<br>
+                                        <small class="text-muted">{{ $txn->user->connection ?? '' }}</small>
                                     </td>
                                     <td>{{ $txn->package->name ?? '-' }}</td>
                                     <td>
-                                        @if($txn->type === 'prime_sponsor')
+                                        @if($txn->package_category === 'prime_package')
                                             <span class="badge badge-warning">Prime Sponsor</span>
+                                        @elseif($txn->package_category === 'premium_package')
+                                            <span class="badge badge-success">Premium Sponsor</span>
                                         @else
-                                            <span class="badge badge-success">Binary Sponsor</span>
+                                            <span class="badge badge-info">Basic Sponsor</span>
                                         @endif
                                     </td>
-                                    <td>₹{{ number_format($txn->amount, 2) }}</td>
+                                    <td>₹{{ number_format($txn->income, 2) }}</td>
                                     <td>{{ $txn->created_at->format('d-m-Y h:i A') }}</td>
                                 </tr>
                             @empty

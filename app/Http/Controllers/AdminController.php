@@ -1633,7 +1633,6 @@ class AdminController extends Controller
 
 
             $this->updateSponsorLevels($user->id, $request->package_id);
-            $referralIncome = $this->addReferralIncome($user->id, $request->package_id);
             $this->royaltyIncomeAdd($user->id, $request->package_id);
             $this->privilegeIncomeAdd($user->id, $request->package_id);
             $this->boardIncomeAdd($user->id, $request->package_id);
@@ -1948,7 +1947,6 @@ class AdminController extends Controller
         }
 
         $this->updateSponsorLevels($request->userid, $request->package_id);
-        $referralIncome = $this->addReferralIncome($request->userid, $request->package_id);
         $this->royaltyIncomeAdd($request->userid, $request->package_id);
         // Credit sponsor commission if configured on the package (dynamic, package-code-agnostic)
         $this->creditBinarySponsorIncome($request->userid, $request->package_id);
