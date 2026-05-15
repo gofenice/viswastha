@@ -81,7 +81,19 @@
 }
 .root-node .node-img { border-color: #fd7e14; }
 
-/* Package ring colors applied via inline style from DB */
+/* Multi-color package ring */
+.pkg-ring {
+    display: inline-block;
+    border-radius: 50%;
+    padding: 4px;
+    margin-bottom: 10px;
+    line-height: 0;
+}
+.pkg-ring .node-img {
+    border: none !important;
+    box-shadow: none !important;
+    margin-bottom: 0;
+}
 
 .node-id   { font-size: 36px; color: #007bff; font-weight: 700; margin-bottom: 6px; }
 .node-name { font-size: 43px; color: #222; font-weight: 600; margin-bottom: 12px; word-break: break-word; line-height: 1.35; }
@@ -766,13 +778,27 @@ function renderBinaryTree() {
         const el = document.createElement('div');
         if (n.user) {
             const hasMore  = n.user.has_more ?? false;
-            const pkgColor = n.user.package_color || null;
+            const colors = (n.user.package_colors && n.user.package_colors.length)
+                ? n.user.package_colors
+                : (n.user.package_color ? [n.user.package_color] : []);
             el.className = 'node-card' + (n.isRoot ? ' root-node' : '');
             const imgSrc = n.user.user_image
                 ? '/' + n.user.user_image
                 : '/assets/dist/img/images.jpg';
-            const imgStyle = pkgColor ? ' style="border-color:' + pkgColor + '!important;box-shadow:0 0 0 2px ' + pkgColor + '55;cursor:pointer;"' : ' style="cursor:pointer;"';
-            const imgTag = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img"' + imgStyle + ' alt="user" onclick="viewSubtree(event,' + n.user.id + ')" title="View ' + (n.user.name||'').replace(/'/g,"&#39;").replace(/"/g,'&quot;') + '\'s tree">';
+            const imgEl = '<img src="' + imgSrc + '" onerror="this.src=\'/assets/dist/img/images.jpg\'" class="node-img" style="cursor:pointer;" alt="user" onclick="viewSubtree(event,' + n.user.id + ')" title="View ' + (n.user.name||'').replace(/'/g,"&#39;").replace(/"/g,'&quot;') + '\'s tree">';
+            let imgTag;
+            if (colors.length === 0) {
+                imgTag = imgEl;
+            } else if (colors.length === 1) {
+                imgTag = '<div class="pkg-ring" style="background:' + colors[0] + ';cursor:pointer;">' + imgEl + '</div>';
+            } else {
+                const stops = colors.map(function(c, i) {
+                    const s = (i / colors.length * 100).toFixed(1) + '%';
+                    const e = ((i + 1) / colors.length * 100).toFixed(1) + '%';
+                    return c + ' ' + s + ' ' + e;
+                }).join(', ');
+                imgTag = '<div class="pkg-ring" style="background:conic-gradient(' + stops + ');cursor:pointer;">' + imgEl + '</div>';
+            }
             const imgHtml = hasMore
                 ? '<div class="node-img-wrap">' + imgTag + '<div class="has-more-badge" onclick="viewSubtree(event,' + n.user.id + ')" title="Has children — click to view"><i class="fas fa-chevron-down"></i></div></div>'
                 : imgTag;

@@ -7726,7 +7726,8 @@ class AdminController extends Controller
             $node->right_premium_vol = (($hasPremium || $hasPrime) && $rightChildId)
                 ? $legVolume($rightChildId, 'premium_package') + $legVolume($rightChildId, 'prime_package') : 0;
 
-            $node->package_color = $topPkg ? ($topPkg->color ?: '#6c757d') : null;
+            $node->package_colors = $pkgs->pluck('color')->filter()->unique()->values()->all();
+            $node->package_color  = $topPkg ? ($topPkg->color ?: '#6c757d') : null;
 
             if (in_array('premium_package', $codes))     { $node->package_type = 'premium'; }
             elseif (in_array('basic_package', $codes))   { $node->package_type = 'basic'; }
