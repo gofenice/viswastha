@@ -119,21 +119,14 @@
                                 <td class="text-center {{ $log->flushed_left  > 0 ? 'text-danger' : '' }}">{{ $log->flushed_left }}</td>
                                 <td class="text-center {{ $log->flushed_right > 0 ? 'text-danger' : '' }}">{{ $log->flushed_right }}</td>
                                 <td class="text-center text-nowrap">
-                                    <button class="btn btn-xs btn-info btn-popup"
-                                            data-log="{{ $log->id }}"
-                                            data-user="{{ $log->user_id }}"
-                                            data-date="{{ \Carbon\Carbon::parse($log->calc_date)->toDateString() }}"
-                                            data-package-id="{{ $log->package_id }}"
-                                            data-package="{{ $log->package_type === 'basic_package' ? 'Basic' : 'Premium' }}"
-                                            title="Calculation detail">
-                                        <i class="fas fa-search"></i>
-                                    </button>
                                     @if($log->capped_pairs > 0)
-                                    <button class="btn btn-xs btn-success ml-1 btn-pairs"
+                                    <button class="btn btn-xs btn-success btn-pairs"
                                             data-log="{{ $log->id }}"
                                             title="Paired users">
                                         <i class="fas fa-users"></i>
                                     </button>
+                                    @else
+                                        <span class="text-muted">—</span>
                                     @endif
                                 </td>
                             </tr>
@@ -164,21 +157,6 @@
     </section>
 </div>
 
-{{-- Calculation Detail Modal --}}
-<div class="modal fade" id="incomeDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="incomeDetailTitle">Income Detail</h5>
-                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
-            </div>
-            <div class="modal-body" id="incomeDetailBody">
-                <div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
-            </div>
-        </div>
-    </div>
-</div>
-
 {{-- Paired Users Modal --}}
 <div class="modal fade" id="pairsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -196,153 +174,6 @@
 
 @section('footer')
 <script>
-document.querySelectorAll('.btn-popup').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-        const userId    = this.dataset.user;
-        const date      = this.dataset.date;
-        const pkg       = this.dataset.package;
-        const packageId = this.dataset.packageId;
-        const logId     = this.dataset.log;
-        document.getElementById('incomeDetailTitle').textContent = 'Detail — ' + pkg + ' — ' + date;
-        document.getElementById('incomeDetailBody').innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading…</div>';
-        $('#incomeDetailModal').modal('show');
-
-        fetch('{{ route('admin.binary_income.popup') }}?log_id=' + logId + '&user_id=' + userId + '&date=' + date + '&package_id=' + packageId)
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) {
-                    document.getElementById('incomeDetailBody').innerHTML = '<p class="text-danger">' + data.error + '</p>';
-                    return;
-                }
-                const log = data.log;
-                const w   = data.wallet || {};
-                const hasPrime      = data.has_prime || false;
-                const leftPremium   = data.left_premium  ?? log.new_left;
-                const rightPremium  = data.right_premium ?? log.new_right;
-                const leftPrime     = data.left_prime    ?? 0;
-                const rightPrime    = data.right_prime   ?? 0;
-                const primeCarryInL = data.prime_carry_in_left  ?? 0;
-                const primeCarryInR = data.prime_carry_in_right ?? 0;
-                const oddPrimeL = hasPrime ? (leftPrime  + primeCarryInL) % 2 : 0;
-                const oddPrimeR = hasPrime ? (rightPrime + primeCarryInR) % 2 : 0;
-                const flushedPrimeL = Math.max(0, oddPrimeL - (log.prime_carry_out_left  ?? 0));
-                const flushedPrimeR = Math.max(0, oddPrimeR - (log.prime_carry_out_right ?? 0));
-                const isBasic = log.package_type === 'basic_package';
-                const pBadge  = isBasic
-                    ? `<span class="badge" style="background:#cce5ff;color:#004085;border:1px solid #007bff;font-size:10px;vertical-align:middle;">Basic</span>`
-                    : `<span class="badge" style="background:#d4edda;color:#155724;border:1px solid #28a745;font-size:10px;vertical-align:middle;">Premium</span>`;
-                const prBadge = `<span class="badge" style="background:#fff3e0;color:#7a3300;border:1px solid #fd7e14;font-size:10px;vertical-align:middle;">Prime</span>`;
-                function sectionCard(title, color, rows) {
-                    return `<div class="card card-outline card-${color} mb-2">
-                        <div class="card-header p-2 font-weight-bold" style="font-size:13px;">${title}</div>
-                        <div class="card-body p-2" style="font-size:13px;">${rows}</div>
-                    </div>`;
-                }
-                function splitRow(pVal, prVal, pClass='', prClass='') {
-                    return `<div class="d-flex justify-content-between mb-1" style="font-size:13px;">
-                        <span>${pBadge} <span class="${pClass} font-weight-bold" style="font-size:13px;">${pVal}</span></span>
-                        ${hasPrime ? `<span>${prBadge} <span class="${prClass} font-weight-bold" style="font-size:13px;">${prVal}</span></span>` : ''}
-                    </div>`;
-                }
-                document.getElementById('incomeDetailBody').innerHTML = `
-                <h6 class="text-primary border-bottom pb-1 mb-3" style="font-size:14px;">Pair Calculation — ${date}</h6>
-
-                <div class="row mb-1">
-                    <div class="col-6 pr-1">
-                        ${sectionCard('New Left', 'primary', splitRow(leftPremium, leftPrime))}
-                    </div>
-                    <div class="col-6 pl-1">
-                        ${sectionCard('New Right', 'primary', splitRow(rightPremium, rightPrime))}
-                    </div>
-                </div>
-
-                ${(log.carry_in_left > 0 || log.carry_in_right > 0) ? `
-                <div class="row mb-1">
-                    <div class="col-6 pr-1">
-                        ${sectionCard('Carry In Left', 'info', splitRow(log.carry_in_left, 0, log.carry_in_left > 0 ? 'text-info' : '', ''))}
-                    </div>
-                    <div class="col-6 pl-1">
-                        ${sectionCard('Carry In Right', 'info', splitRow(log.carry_in_right, 0, log.carry_in_right > 0 ? 'text-info' : '', ''))}
-                    </div>
-                </div>` : ''}
-
-                <div class="card card-outline card-success mb-2">
-                    <div class="card-header p-2 font-weight-bold" style="font-size:13px;">Matched Pairs</div>
-                    <div class="card-body p-2">
-                        <div class="row text-center">
-                            <div class="col-6 border-right">
-                                <div style="font-size:11px;color:#888;">Matched</div>
-                                <div class="font-weight-bold" style="font-size:18px;">${log.matched_pairs}</div>
-                            </div>
-                            <div class="col-6">
-                                <div style="font-size:11px;color:#888;">Capped</div>
-                                <div class="font-weight-bold text-primary" style="font-size:18px;">${log.capped_pairs}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="alert alert-success py-2 mb-2 text-center">
-                    <b style="font-size:15px;">Income Earned — ₹${parseFloat(log.income).toLocaleString('en-IN', {minimumFractionDigits:2})}</b>
-                </div>
-
-                <div class="row mb-1">
-                    <div class="col-6 pr-1">
-                        ${sectionCard('Carry Out Left', 'warning', splitRow(log.carry_out_left, log.prime_carry_out_left ?? 0, log.carry_out_left > 0 ? 'text-warning' : '', (log.prime_carry_out_left ?? 0) > 0 ? 'text-warning' : ''))}
-                    </div>
-                    <div class="col-6 pl-1">
-                        ${sectionCard('Carry Out Right', 'warning', splitRow(log.carry_out_right, log.prime_carry_out_right ?? 0, log.carry_out_right > 0 ? 'text-warning' : '', (log.prime_carry_out_right ?? 0) > 0 ? 'text-warning' : ''))}
-                    </div>
-                </div>
-
-                <div class="card card-outline card-danger mb-2">
-                    <div class="card-header p-2 font-weight-bold" style="font-size:13px;">Flushed</div>
-                    <div class="card-body p-2" style="font-size:13px;">
-                        <div class="row">
-                            <div class="col-6 border-right">
-                                <div style="font-size:11px;color:#888;margin-bottom:4px;">Left</div>
-                                ${splitRow(log.flushed_left, flushedPrimeL, log.flushed_left > 0 ? 'text-danger' : '', flushedPrimeL > 0 ? 'text-danger' : '')}
-                            </div>
-                            <div class="col-6">
-                                <div style="font-size:11px;color:#888;margin-bottom:4px;">Right</div>
-                                ${splitRow(log.flushed_right, flushedPrimeR, log.flushed_right > 0 ? 'text-danger' : '', flushedPrimeR > 0 ? 'text-danger' : '')}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="callout callout-info mb-0" style="font-size:12px;">
-                    <b style="font-size:12px;">How it worked:</b><br>
-                    ${hasPrime
-                        ? `<span style="font-size:12px;">New L: ${leftPremium} premium + ${leftPrime} prime (÷2=${Math.floor(leftPrime/2)}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> equiv</span><br>
-                           <span style="font-size:12px;">New R: ${rightPremium} premium + ${rightPrime} prime (÷2=${Math.floor(rightPrime/2)}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> equiv</span><br>`
-                        : `<span style="font-size:12px;">New L(${log.new_left}) + Carry(${log.carry_in_left}) = <b>${log.total_left}</b> left</span><br>
-                           <span style="font-size:12px;">New R(${log.new_right}) + Carry(${log.carry_in_right}) = <b>${log.total_right}</b> right</span><br>`}
-                    ${(() => {
-                        const L = log.total_left, R = log.total_right;
-                        if (log.is_first_run) {
-                            const leftPrimary = L >= R;
-                            const primary   = leftPrimary ? 'Left' : 'Right';
-                            const secondary = leftPrimary ? 'Right' : 'Left';
-                            const extraPairs = log.matched_pairs - 1;
-                            return `<span class="text-warning" style="font-size:12px;">First run 2:1 — 2 from ${primary} + 1 from ${secondary} = 1st pair</span><br>` +
-                                   (extraPairs > 0 ? `<span style="font-size:12px;">Then 1:1 → <b>${extraPairs}</b> more pair(s)</span><br>` : '');
-                        }
-                        return `<span style="font-size:12px;">Min(${L}, ${R}) = <b>${log.matched_pairs}</b> matched</span><br>`;
-                    })()}
-                    <span style="font-size:12px;">Capped at <b>${log.capped_pairs}</b> → ₹<b>${parseFloat(log.income).toLocaleString('en-IN')}</b></span><br>
-                    ${(log.carry_out_left > 0 || (log.prime_carry_out_left ?? 0) > 0) ? `<span style="font-size:12px;">Left carries <b>${log.carry_out_left}</b> ${isBasic ? 'basic' : 'premium'}${(log.prime_carry_out_left ?? 0) > 0 ? ` + <b>${log.prime_carry_out_left}</b> prime` : ''} forward</span><br>` : ''}
-                    ${(log.carry_out_right > 0 || (log.prime_carry_out_right ?? 0) > 0) ? `<span style="font-size:12px;">Right carries <b>${log.carry_out_right}</b> ${isBasic ? 'basic' : 'premium'}${(log.prime_carry_out_right ?? 0) > 0 ? ` + <b>${log.prime_carry_out_right}</b> prime` : ''} forward</span><br>` : ''}
-                    ${(log.flushed_left > 0 || flushedPrimeL > 0 || log.flushed_right > 0 || flushedPrimeR > 0)
-                        ? `<span class="text-danger" style="font-size:12px;">Flushed — L: ${log.flushed_left} premium, ${flushedPrimeL} prime &nbsp;|&nbsp; R: ${log.flushed_right} premium, ${flushedPrimeR} prime</span>` : ''}
-                </div>`;
-            })
-            .catch(() => {
-                document.getElementById('incomeDetailBody').innerHTML = '<p class="text-danger">Failed to load data.</p>';
-            });
-    });
-});
-
 document.querySelectorAll('.btn-pairs').forEach(function(btn) {
     btn.addEventListener('click', function() {
         const logId = this.dataset.log;
