@@ -400,17 +400,16 @@ class AdminController extends Controller
             ->orderBy('calc_date', 'desc')
             ->get();
 
-        $referralTransactions = \App\Models\BinaryTransaction::where('user_id', $userId)
-            ->whereIn('type', ['binary_sponsor', 'prime_sponsor'])
+        $referralTransactions = ReferralIncome::with(['user', 'package'])
+            ->where('sponsor_id', $userId)
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $wallet           = \App\Models\BinaryWallet::where('user_id', $userId)->first();
-        $pairIncomeTotal  = $pairLogs->sum('income');
-        $sponsorIncomeTotal = $referralTransactions->sum('amount');
+        $pairIncomeTotal    = $pairLogs->sum('income');
+        $sponsorIncomeTotal = $referralTransactions->sum('income');
 
         return view('Admin/binary_income_user', compact(
-            'pairLogs', 'referralTransactions', 'wallet', 'yesterday',
+            'pairLogs', 'referralTransactions', 'yesterday',
             'pairIncomeTotal', 'sponsorIncomeTotal'
         ));
     }
@@ -7470,8 +7469,7 @@ class AdminController extends Controller
             'upgraded_from_package_id' => $packageId,
         ]);
 
-        // Credit sponsor income for the upgrade package as well
-        $this->creditBinarySponsorIncome($userId, $package->auto_upgrade_to_package_id);
+        // No sponsor income for auto-upgrade — sponsor already earned commission on the prime packages
     }
 
     public function getUserPackageDetails(Request $request)
@@ -7826,12 +7824,11 @@ class AdminController extends Controller
     {
         $user = auth()->user();
 
-        $query = \App\Models\BinaryTransaction::with(['user', 'fromUser', 'package'])
-            ->whereIn('type', ['binary_sponsor', 'prime_sponsor'])
+        $query = ReferralIncome::with(['sponsor', 'user', 'package'])
             ->orderBy('created_at', 'desc');
 
         if ($user->role !== 'superadmin') {
-            $query->where('user_id', $user->id);
+            $query->where('sponsor_id', $user->id);
         }
 
         // Optional date filters
@@ -7843,7 +7840,7 @@ class AdminController extends Controller
         }
 
         $transactions = $query->get();
-        $totalAmount  = $transactions->sum('amount');
+        $totalAmount  = $transactions->sum('income');
 
         return view('Admin.sponsor_income_details', compact('transactions', 'totalAmount'));
     }
