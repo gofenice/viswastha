@@ -23,6 +23,8 @@
 .node-lr .leg-side { font-weight: 700; font-size: 36px; margin-bottom: 2px; }
 .node-lr .leg-basic   { color: #856404; background: #fff3cd; border-radius: 4px; padding: 2px 10px; font-size: 32px; }
 .node-lr .leg-premium { color: #155724; background: #d4edda; border-radius: 4px; padding: 2px 10px; font-size: 32px; }
+.leg-clickable { cursor: pointer; text-decoration: underline dotted; transition: opacity .15s; }
+.leg-clickable:hover { opacity: .75; }
 .node-leg    { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 
 .node-action-btn { width: 72px; height: 72px; border-radius: 10px; border: none; font-size: 36px; cursor: pointer; transition: opacity .2s, transform .2s; }
@@ -200,11 +202,12 @@ const RAW_TREE   = @json($binaryTree);
 const CSRF       = '{{ csrf_token() }}';
 
 const ROUTES = {
-    userPackages:  '{{ route("admin.binary_tree.user_packages") }}',
-    reload:        '{{ route("user.binary_tree") }}',
-    transferUser:  '{{ route("admin.binary_tree.transfer_user") }}',
-    searchUsers:   '{{ route("user.binary_tree.search_users") }}',
-    checkSlots:    '{{ route("admin.binary_tree.check_slots") }}',
+    userPackages:    '{{ route("admin.binary_tree.user_packages") }}',
+    reload:          '{{ route("user.binary_tree") }}',
+    transferUser:    '{{ route("admin.binary_tree.transfer_user") }}',
+    searchUsers:     '{{ route("user.binary_tree.search_users") }}',
+    checkSlots:      '{{ route("admin.binary_tree.check_slots") }}',
+    legVolumeDetail: '{{ route("admin.binary_tree.leg_volume_detail") }}',
 };
 
 const PKG_BADGE_CLASS = { basic_package: 'basic', premium_package: 'premium', prime_package: 'prime' };
@@ -418,13 +421,13 @@ allNodes.forEach(function (n) {
             '<div class="node-lr">' +
                 '<div class="node-leg">' +
                     '<span class="leg-side">L: ' + (n.user.left_count ?? 0) + '</span>' +
-                    '<span class="leg-basic">BSV: ₹' + (n.user.left_basic_vol ?? 0).toLocaleString('en-IN') + '</span>' +
-                    '<span class="leg-premium">PSV: ₹' + (n.user.left_premium_vol ?? 0).toLocaleString('en-IN') + '</span>' +
+                    '<span class="leg-basic leg-clickable" onclick="showLegDetail(event,' + n.user.id + ',\'left\',\'basic_package\')">BSV: ₹' + (n.user.left_basic_vol ?? 0).toLocaleString('en-IN') + '</span>' +
+                    '<span class="leg-premium leg-clickable" onclick="showLegDetail(event,' + n.user.id + ',\'left\',\'premium_package\')">PSV: ₹' + (n.user.left_premium_vol ?? 0).toLocaleString('en-IN') + '</span>' +
                 '</div>' +
                 '<div class="node-leg">' +
                     '<span class="leg-side">R: ' + (n.user.right_count ?? 0) + '</span>' +
-                    '<span class="leg-basic">BSV: ₹' + (n.user.right_basic_vol ?? 0).toLocaleString('en-IN') + '</span>' +
-                    '<span class="leg-premium">PSV: ₹' + (n.user.right_premium_vol ?? 0).toLocaleString('en-IN') + '</span>' +
+                    '<span class="leg-basic leg-clickable" onclick="showLegDetail(event,' + n.user.id + ',\'right\',\'basic_package\')">BSV: ₹' + (n.user.right_basic_vol ?? 0).toLocaleString('en-IN') + '</span>' +
+                    '<span class="leg-premium leg-clickable" onclick="showLegDetail(event,' + n.user.id + ',\'right\',\'premium_package\')">PSV: ₹' + (n.user.right_premium_vol ?? 0).toLocaleString('en-IN') + '</span>' +
                 '</div>' +
             '</div>' +
             '<div class="node-actions">' +
@@ -475,5 +478,56 @@ function scaleTree() {
 }
 scaleTree();
 $(window).on('resize', function () { setTimeout(scaleTree, 50); });
+
+function showLegDetail(e, userId, side, packageCode) {
+    e.stopPropagation();
+    const label     = packageCode === 'basic_package' ? 'BSV (Basic)' : 'PSV (Premium)';
+    const sideLabel = side === 'left' ? 'Left' : 'Right';
+    $('#legDetailTitle').text(sideLabel + ' Leg — ' + label + ' Breakdown');
+    $('#legDetailBody').html('<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>');
+    $('#legDetailModal').modal('show');
+
+    $.get(ROUTES.legVolumeDetail, { user_id: userId, side: side, package_code: packageCode }, function (res) {
+        if (!res.rows || !res.rows.length) {
+            $('#legDetailBody').html('<p class="text-muted text-center py-3">No activations found in this leg.</p>');
+            return;
+        }
+        let html = '<table class="table table-sm table-bordered">' +
+            '<thead class="thead-dark"><tr>' +
+            '<th>#</th><th>ID</th><th>Name</th><th>Package</th><th>Activated On</th><th class="text-right">BV</th>' +
+            '</tr></thead><tbody>';
+        res.rows.forEach(function (r, i) {
+            html += '<tr>' +
+                '<td>' + (i + 1) + '</td>' +
+                '<td class="text-primary font-weight-bold">' + r.connection + '</td>' +
+                '<td>' + r.name + '</td>' +
+                '<td>' + r.package_name + '</td>' +
+                '<td>' + (r.activated_at ? r.activated_at.substring(0, 10) : '') + '</td>' +
+                '<td class="text-right font-weight-bold">₹' + Number(r.bv).toLocaleString('en-IN') + '</td>' +
+                '</tr>';
+        });
+        html += '</tbody><tfoot><tr class="table-info font-weight-bold">' +
+            '<td colspan="5" class="text-right">Total BV</td>' +
+            '<td class="text-right">₹' + Number(res.total_bv).toLocaleString('en-IN') + '</td>' +
+            '</tr></tfoot></table>';
+        $('#legDetailBody').html(html);
+    }).fail(function () {
+        $('#legDetailBody').html('<p class="text-danger text-center">Failed to load data.</p>');
+    });
+}
 </script>
+
+{{-- Leg volume detail modal --}}
+<div class="modal fade" id="legDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="legDetailTitle">Leg Volume Breakdown</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body" id="legDetailBody"></div>
+        </div>
+    </div>
+</div>
+
 @endsection
