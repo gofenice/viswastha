@@ -198,7 +198,7 @@
                                 <div class="form-group col-md-6">
                                     <label>Sponsor ID <span class="text-danger">*</span></label>
                                     <input type="text" name="sponsor_id" id="userSponsorIdInput" class="form-control"
-                                           value="{{ $me->connection }}" placeholder="Sponsor connection code" required autocomplete="off">
+                                           value="" placeholder="Enter Sponsor ID" required autocomplete="off">
                                     <small id="userSponsorNamePreview" class="mt-1 d-block text-success" style="min-height:16px;"></small>
                                 </div>
                                 <div class="form-group col-md-6" id="fgPassword">
@@ -421,14 +421,12 @@ function openPlaceModal(parentId, position) {
     // Reset to first tab
     $('#placeTabs a[href="#tabExisting"]').tab('show');
     $('#newUserForm')[0].reset();
-    // Restore pre-filled sponsor and reset registration type UI
-    $('#userSponsorIdInput').val('{{ $me->connection }}');
+    // Reset registration type UI
     $('#userSponsorNamePreview').text('');
     $('input[name="reg_type"][value="wpan"]').prop('checked', true);
     $('#panCardField').hide();
     $('#panCardInput').prop('required', false);
     $('#tempTestNotice').hide();
-    $('#fgName,#fgEmail,#fgPhone,#fgPincode,#fgPassword,#fgPasswordConfirm,#fgAddress').show();
     $('#placeUserModal').modal('show');
 }
 
@@ -442,15 +440,24 @@ $('#placeTabs a[href="#tabExisting"]').on('shown.bs.tab', function () {
 });
 
 // Registration type toggle
-const $normalFields = $('#fgName,#fgEmail,#fgPhone,#fgPincode,#fgPassword,#fgPasswordConfirm,#fgAddress');
 $('input[name="reg_type"]').on('change', function () {
     const val      = $(this).val();
     const withPan  = (val === 'withpan');
     const tempTest = (val === 'temptest');
     $('#panCardField').toggle(withPan || tempTest);
     $('#panCardInput').prop('required', withPan || tempTest);
-    $normalFields.toggle(!tempTest);
     $('#tempTestNotice').toggle(tempTest);
+    // Pre-fill dummy defaults when switching to temp mode; clear when switching away
+    if (tempTest) {
+        const ts = Date.now();
+        const $f = $('#newUserForm');
+        if (!$f.find('[name="name"]').val())     $f.find('[name="name"]').val('TestUser_' + ts);
+        if (!$f.find('[name="email"]').val())    $f.find('[name="email"]').val('test_' + ts + '@test.com');
+        if (!$f.find('[name="phone_no"]').val()) $f.find('[name="phone_no"]').val('9999999999');
+        if (!$f.find('[name="pincode"]').val())  $f.find('[name="pincode"]').val('560001');
+        if (!$f.find('[name="password"]').val()) { $f.find('[name="password"]').val('Test@1234'); $f.find('[name="password_confirmation"]').val('Test@1234'); }
+        if (!$f.find('[name="address"]').val())  $f.find('[name="address"]').val('Test Address, Bangalore');
+    }
 });
 
 // Sponsor name preview
@@ -558,19 +565,6 @@ $('#btnPlaceUser').on('click', function () {
         const tempTest = (regType === 'temptest');
 
         $('#panCardInput').prop('required', usePan || tempTest);
-
-        // Auto-fill dummy data for temp/testing mode
-        if (tempTest) {
-            const ts = Date.now();
-            const $f = $('#newUserForm');
-            $f.find('[name="name"]').val('TestUser_' + ts);
-            $f.find('[name="email"]').val('test_' + ts + '@test.com');
-            $f.find('[name="phone_no"]').val('9999999999');
-            $f.find('[name="pincode"]').val('560001');
-            $f.find('[name="password"]').val('Test@1234');
-            $f.find('[name="password_confirmation"]').val('Test@1234');
-            $f.find('[name="address"]').val('Test Address, Bangalore');
-        }
 
         const form = document.getElementById('newUserForm');
         if (!form.checkValidity()) { form.reportValidity(); return; }
