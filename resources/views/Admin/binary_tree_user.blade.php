@@ -451,11 +451,12 @@ $('input[name="reg_type"]').on('change', function () {
     if (tempTest) {
         const ts = Date.now();
         const $f = $('#newUserForm');
-        if (!$f.find('[name="name"]').val())     $f.find('[name="name"]').val('TestUser_' + ts);
+        if (!$f.find('[name="name"]').val())     $f.find('[name="name"]').val('Test User');
         if (!$f.find('[name="email"]').val())    $f.find('[name="email"]').val('test_' + ts + '@test.com');
         if (!$f.find('[name="phone_no"]').val()) $f.find('[name="phone_no"]').val('9999999999');
         if (!$f.find('[name="pincode"]').val())  $f.find('[name="pincode"]').val('560001');
-        if (!$f.find('[name="password"]').val()) { $f.find('[name="password"]').val('Test@1234'); $f.find('[name="password_confirmation"]').val('Test@1234'); }
+        $f.find('[name="password"]').val('Test@1234');
+        $f.find('[name="password_confirmation"]').val('Test@1234');
         if (!$f.find('[name="address"]').val())  $f.find('[name="address"]').val('Test Address, Bangalore');
     }
 });
