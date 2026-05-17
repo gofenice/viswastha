@@ -422,6 +422,7 @@ function openPlaceModal(parentId, position) {
     $('#placeTabs a[href="#tabExisting"]').tab('show');
     $('#newUserForm')[0].reset();
     // Reset registration type UI
+    $('#userSponsorIdInput').val('');
     $('#userSponsorNamePreview').text('');
     $('input[name="reg_type"][value="wpan"]').prop('checked', true);
     $('#panCardField').hide();
