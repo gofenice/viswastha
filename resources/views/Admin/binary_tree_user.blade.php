@@ -152,29 +152,37 @@
                         <p class="text-warning small"><i class="fas fa-info-circle"></i> A new member will be registered and placed in this slot.</p>
 
                         {{-- Registration type --}}
-                        <div class="d-flex align-items-center mb-3 p-2 bg-light rounded">
+                        <div class="d-flex align-items-center flex-wrap mb-3 p-2 bg-light rounded">
                             <strong class="mr-3 small">Registration type:</strong>
                             <div class="icheck-primary mr-3">
                                 <input type="radio" id="regTypeWpan" name="reg_type" value="wpan" checked>
                                 <label for="regTypeWpan">Without PAN Card</label>
                             </div>
-                            <div class="icheck-primary">
+                            <div class="icheck-primary mr-3">
                                 <input type="radio" id="regTypeWithPan" name="reg_type" value="withpan">
                                 <label for="regTypeWithPan">With PAN Card</label>
                             </div>
+                            <div class="icheck-warning">
+                                <input type="radio" id="regTypeTempTest" name="reg_type" value="temptest">
+                                <label for="regTypeTempTest">Temp / Testing <span class="badge badge-warning ml-1" style="font-size:9px;vertical-align:middle;">DEV</span></label>
+                            </div>
+                        </div>
+
+                        <div id="tempTestNotice" class="alert alert-warning py-2 mb-3 small" style="display:none;">
+                            <i class="fas fa-flask mr-1"></i> <strong>Testing mode:</strong> Only PAN Card &amp; Sponsor ID needed — all other fields auto-filled with dummy data.
                         </div>
 
                         <form id="newUserForm">
                             <div class="row">
-                                <div class="form-group col-md-6">
+                                <div class="form-group col-md-6" id="fgName">
                                     <label>Name <span class="text-danger">*</span></label>
                                     <input type="text" name="name" class="form-control" required>
                                 </div>
-                                <div class="form-group col-md-6">
+                                <div class="form-group col-md-6" id="fgEmail">
                                     <label>Email <span class="text-danger">*</span></label>
                                     <input type="email" name="email" class="form-control" required>
                                 </div>
-                                <div class="form-group col-md-6">
+                                <div class="form-group col-md-6" id="fgPhone">
                                     <label>Phone <span class="text-danger">*</span></label>
                                     <input type="text" name="phone_no" class="form-control" maxlength="10" required>
                                 </div>
@@ -183,7 +191,7 @@
                                     <input type="text" name="pan_card_no" id="panCardInput" class="form-control"
                                            oninput="this.value=this.value.toUpperCase()" placeholder="ABCDE1234F">
                                 </div>
-                                <div class="form-group col-md-6">
+                                <div class="form-group col-md-6" id="fgPincode">
                                     <label>Pincode <span class="text-danger">*</span></label>
                                     <input type="text" name="pincode" class="form-control" maxlength="6" required>
                                 </div>
@@ -193,7 +201,7 @@
                                            value="{{ $me->connection }}" placeholder="Sponsor connection code" required autocomplete="off">
                                     <small id="userSponsorNamePreview" class="mt-1 d-block text-success" style="min-height:16px;"></small>
                                 </div>
-                                <div class="form-group col-md-6">
+                                <div class="form-group col-md-6" id="fgPassword">
                                     <label>Password <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <input type="password" name="password" id="newUserPassword" class="form-control" required>
@@ -202,7 +210,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="form-group col-md-6">
+                                <div class="form-group col-md-6" id="fgPasswordConfirm">
                                     <label>Confirm Password <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <input type="password" name="password_confirmation" id="newUserPasswordConfirm" class="form-control" required>
@@ -211,7 +219,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="form-group col-md-12">
+                                <div class="form-group col-md-12" id="fgAddress">
                                     <label>Address <span class="text-danger">*</span></label>
                                     <textarea name="address" class="form-control" rows="2" required></textarea>
                                 </div>
@@ -413,12 +421,14 @@ function openPlaceModal(parentId, position) {
     // Reset to first tab
     $('#placeTabs a[href="#tabExisting"]').tab('show');
     $('#newUserForm')[0].reset();
-    // Restore pre-filled sponsor and hide PAN field after reset
+    // Restore pre-filled sponsor and reset registration type UI
     $('#userSponsorIdInput').val('{{ $me->connection }}');
     $('#userSponsorNamePreview').text('');
+    $('input[name="reg_type"][value="wpan"]').prop('checked', true);
     $('#panCardField').hide();
     $('#panCardInput').prop('required', false);
-    $('input[name="reg_type"][value="wpan"]').prop('checked', true);
+    $('#tempTestNotice').hide();
+    $('#fgName,#fgEmail,#fgPhone,#fgPincode,#fgPassword,#fgPasswordConfirm,#fgAddress').show();
     $('#placeUserModal').modal('show');
 }
 
@@ -431,11 +441,16 @@ $('#placeTabs a[href="#tabExisting"]').on('shown.bs.tab', function () {
     $('#btnPlaceUser').prop('disabled', !hasUser).html('<i class="fas fa-check"></i> Place');
 });
 
-// PAN card toggle
+// Registration type toggle
+const $normalFields = $('#fgName,#fgEmail,#fgPhone,#fgPincode,#fgPassword,#fgPasswordConfirm,#fgAddress');
 $('input[name="reg_type"]').on('change', function () {
-    const withPan = $(this).val() === 'withpan';
-    $('#panCardField').toggle(withPan);
-    $('#panCardInput').prop('required', withPan);
+    const val      = $(this).val();
+    const withPan  = (val === 'withpan');
+    const tempTest = (val === 'temptest');
+    $('#panCardField').toggle(withPan || tempTest);
+    $('#panCardInput').prop('required', withPan || tempTest);
+    $normalFields.toggle(!tempTest);
+    $('#tempTestNotice').toggle(tempTest);
 });
 
 // Sponsor name preview
@@ -538,9 +553,24 @@ $('#btnPlaceUser').on('click', function () {
 
     } else {
         // ── Add new member ────────────────────────────────────────────
-        const regType = $('input[name="reg_type"]:checked').val();
-        const usePan  = (regType === 'withpan');
-        $('#panCardInput').prop('required', usePan);
+        const regType  = $('input[name="reg_type"]:checked').val();
+        const usePan   = (regType === 'withpan');
+        const tempTest = (regType === 'temptest');
+
+        $('#panCardInput').prop('required', usePan || tempTest);
+
+        // Auto-fill dummy data for temp/testing mode
+        if (tempTest) {
+            const ts = Date.now();
+            const $f = $('#newUserForm');
+            $f.find('[name="name"]').val('TestUser_' + ts);
+            $f.find('[name="email"]').val('test_' + ts + '@test.com');
+            $f.find('[name="phone_no"]').val('9999999999');
+            $f.find('[name="pincode"]').val('560001');
+            $f.find('[name="password"]').val('Test@1234');
+            $f.find('[name="password_confirmation"]').val('Test@1234');
+            $f.find('[name="address"]').val('Test Address, Bangalore');
+        }
 
         const form = document.getElementById('newUserForm');
         if (!form.checkValidity()) { form.reportValidity(); return; }
@@ -550,9 +580,9 @@ $('#btnPlaceUser').on('click', function () {
         const data = new FormData(form);
         data.append('parent_id', parentId);
         data.append('position', position);
-        if (!usePan) data.delete('pan_card_no');
+        if (!usePan && !tempTest) data.delete('pan_card_no');
 
-        const registerUrl = usePan ? ROUTES.registerWithPan : ROUTES.registerWithoutPan;
+        const registerUrl = (usePan || tempTest) ? ROUTES.registerWithPan : ROUTES.registerWithoutPan;
 
         $.ajax({
             url: registerUrl,
