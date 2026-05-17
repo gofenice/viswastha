@@ -108,29 +108,93 @@
     </section>
 </div>
 
-{{-- Place User Modal (transfer existing user only — no new user, no quick user) --}}
+{{-- Place User Modal --}}
 <div class="modal fade" id="placeUserModal" tabindex="-1">
-    <div class="modal-dialog modal-md">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="fas fa-user-plus"></i> Place Team Member</h5>
+                <h5 class="modal-title"><i class="fas fa-user-plus"></i> Place Member</h5>
                 <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted small mb-1">
-                    Placing in: <strong id="placementInfo">-</strong>
-                </p>
-                <p class="text-info small mb-3"><i class="fas fa-info-circle"></i> Search and select an existing team member to place in this slot. Only unplaced members are shown.</p>
+                <p class="text-muted small mb-2">Placing in: <strong id="placementInfo">-</strong></p>
 
                 <input type="hidden" id="placementParentId">
                 <input type="hidden" id="placementPosition">
-                <input type="hidden" id="selectedUserId">
 
-                <input type="text" id="userSearchInput" class="form-control mb-1" placeholder="Search by name or ID…" autocomplete="off">
-                <div id="userSearchResults" class="search-results-list mb-2"></div>
-                <div id="userSelectedInfo" class="text-success font-weight-bold small mb-2" style="display:none;"></div>
+                {{-- Tabs --}}
+                <ul class="nav nav-tabs mb-3" id="placeTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-toggle="tab" href="#tabExisting">
+                            <i class="fas fa-search"></i> Place Existing Member
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#tabNewUser">
+                            <i class="fas fa-user-plus"></i> Add New Member
+                        </a>
+                    </li>
+                </ul>
 
-                <div id="placeSlotError" class="text-danger small mt-2" style="display:none;"></div>
+                <div class="tab-content">
+                    {{-- Tab 1: Place existing --}}
+                    <div class="tab-pane fade show active" id="tabExisting">
+                        <p class="text-info small"><i class="fas fa-info-circle"></i> Only unplaced members are shown.</p>
+                        <input type="hidden" id="selectedUserId">
+                        <input type="text" id="userSearchInput" class="form-control mb-1" placeholder="Search by name or ID…" autocomplete="off">
+                        <div id="userSearchResults" class="search-results-list mb-2"></div>
+                        <div id="userSelectedInfo" class="text-success font-weight-bold small mb-2" style="display:none;"></div>
+                        <div id="placeSlotError" class="text-danger small mt-2" style="display:none;"></div>
+                    </div>
+
+                    {{-- Tab 2: Add new member --}}
+                    <div class="tab-pane fade" id="tabNewUser">
+                        <p class="text-warning small"><i class="fas fa-info-circle"></i> A new member will be registered and placed in this slot.</p>
+                        <form id="newUserForm">
+                            <input type="hidden" name="sponsor_id" value="{{ $me->connection }}">
+                            <div class="row">
+                                <div class="form-group col-md-6">
+                                    <label>Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" required>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Email <span class="text-danger">*</span></label>
+                                    <input type="email" name="email" class="form-control" required>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Phone <span class="text-danger">*</span></label>
+                                    <input type="text" name="phone_no" class="form-control" maxlength="10" required>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Pincode <span class="text-danger">*</span></label>
+                                    <input type="text" name="pincode" class="form-control" maxlength="6" required>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Password <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="password" name="password" id="newUserPassword" class="form-control" required>
+                                        <div class="input-group-append">
+                                            <span class="input-group-text" style="cursor:pointer;" onclick="togglePwd('newUserPassword',this)"><i class="fas fa-eye"></i></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Confirm Password <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="password" name="password_confirmation" id="newUserPasswordConfirm" class="form-control" required>
+                                        <div class="input-group-append">
+                                            <span class="input-group-text" style="cursor:pointer;" onclick="togglePwd('newUserPasswordConfirm',this)"><i class="fas fa-eye"></i></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group col-md-12">
+                                    <label>Address <span class="text-danger">*</span></label>
+                                    <textarea name="address" class="form-control" rows="2" required></textarea>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -202,12 +266,13 @@ const RAW_TREE   = @json($binaryTree);
 const CSRF       = '{{ csrf_token() }}';
 
 const ROUTES = {
-    userPackages:    '{{ route("admin.binary_tree.user_packages") }}',
-    reload:          '{{ route("user.binary_tree") }}',
-    transferUser:    '{{ route("admin.binary_tree.transfer_user") }}',
-    searchUsers:     '{{ route("user.binary_tree.search_users") }}',
-    checkSlots:      '{{ route("admin.binary_tree.check_slots") }}',
-    legVolumeDetail: '{{ route("admin.binary_tree.leg_volume_detail") }}',
+    userPackages:       '{{ route("admin.binary_tree.user_packages") }}',
+    reload:             '{{ route("user.binary_tree") }}',
+    transferUser:       '{{ route("admin.binary_tree.transfer_user") }}',
+    searchUsers:        '{{ route("user.binary_tree.search_users") }}',
+    checkSlots:         '{{ route("admin.binary_tree.check_slots") }}',
+    legVolumeDetail:    '{{ route("admin.binary_tree.leg_volume_detail") }}',
+    registerWithoutPan: '{{ route("register.store.wpan") }}',
 };
 
 const PKG_BADGE_CLASS = { basic_package: 'basic', premium_package: 'premium', prime_package: 'prime' };
@@ -312,14 +377,38 @@ $('#updatePinForm').on('submit', function (e) {
 function openPlaceModal(parentId, position) {
     $('#placementParentId').val(parentId);
     $('#placementPosition').val(position);
-    $('#placementInfo').text('Parent ID: ' + parentId + ' — ' + position.charAt(0).toUpperCase() + position.slice(1) + ' slot');
+    $('#placementInfo').text(position.charAt(0).toUpperCase() + position.slice(1) + ' slot');
     $('#selectedUserId').val('');
     $('#userSearchInput').val('');
     $('#userSearchResults').empty();
     $('#userSelectedInfo').hide();
     $('#placeSlotError').hide();
-    $('#btnPlaceUser').prop('disabled', true);
+    $('#btnPlaceUser').prop('disabled', true).text('Place');
+    // Reset to first tab
+    $('#placeTabs a[href="#tabExisting"]').tab('show');
+    $('#newUserForm')[0].reset();
     $('#placeUserModal').modal('show');
+}
+
+// Enable Place button when switching to Add New Member tab
+$('#placeTabs a[href="#tabNewUser"]').on('shown.bs.tab', function () {
+    $('#btnPlaceUser').prop('disabled', false).html('<i class="fas fa-user-plus"></i> Add Member');
+});
+$('#placeTabs a[href="#tabExisting"]').on('shown.bs.tab', function () {
+    const hasUser = !!$('#selectedUserId').val();
+    $('#btnPlaceUser').prop('disabled', !hasUser).html('<i class="fas fa-check"></i> Place');
+});
+
+function togglePwd(fieldId, btn) {
+    const input = document.getElementById(fieldId);
+    const icon  = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
 }
 
 let searchDebounce;
@@ -352,37 +441,91 @@ $('#userSearchInput').on('input', function () {
 });
 
 $('#btnPlaceUser').on('click', function () {
-    const userId   = $('#selectedUserId').val();
+    const $btn     = $(this);
     const parentId = $('#placementParentId').val();
     const position = $('#placementPosition').val();
+    const activeTab = $('#placeTabs .nav-link.active').attr('href');
 
-    if (!userId) { Swal.fire('Warning', 'Please select a team member first.', 'warning'); return; }
+    if ($btn.prop('disabled')) return;
 
-    $(this).prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Placing…');
+    if (activeTab === '#tabExisting') {
+        // ── Transfer existing member ──────────────────────────────────
+        const userId = $('#selectedUserId').val();
+        if (!userId) { Swal.fire('Warning', 'Please select a team member first.', 'warning'); return; }
 
-    $.ajax({
-        url: ROUTES.transferUser,
-        method: 'POST',
-        headers: { 'X-CSRF-TOKEN': CSRF },
-        contentType: 'application/json',
-        data: JSON.stringify({ user_id: userId, parent_id: parentId, position: position }),
-        success: function (res) {
-            if (res.status === 'success') {
-                Swal.fire('Placed!', res.message, 'success').then(function () {
-                    $('#placeUserModal').modal('hide');
-                    reloadPage();
-                });
-            } else {
-                $('#placeSlotError').text(res.message).show();
-                $('#btnPlaceUser').prop('disabled', false).html('<i class="fas fa-check"></i> Place');
+        $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Placing…');
+
+        $.ajax({
+            url: ROUTES.transferUser,
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': CSRF },
+            contentType: 'application/json',
+            data: JSON.stringify({ user_id: userId, parent_id: parentId, position: position }),
+            success: function (res) {
+                if (res.status === 'success') {
+                    Swal.fire('Placed!', res.message, 'success').then(function () {
+                        $('#placeUserModal').modal('hide');
+                        reloadPage();
+                    });
+                } else {
+                    $('#placeSlotError').text(res.message).show();
+                    $btn.prop('disabled', false).html('<i class="fas fa-check"></i> Place');
+                }
+            },
+            error: function (xhr) {
+                Swal.fire('Error', xhr.responseJSON?.message || 'Something went wrong.', 'error');
+                $btn.prop('disabled', false).html('<i class="fas fa-check"></i> Place');
             }
-        },
-        error: function (xhr) {
-            const msg = xhr.responseJSON?.message || 'Something went wrong.';
-            Swal.fire('Error', msg, 'error');
-            $('#btnPlaceUser').prop('disabled', false).html('<i class="fas fa-check"></i> Place');
-        }
-    });
+        });
+
+    } else {
+        // ── Add new member ────────────────────────────────────────────
+        const form = document.getElementById('newUserForm');
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+
+        $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Registering…');
+
+        const data = new FormData(form);
+        data.append('parent_id', parentId);
+        data.append('position', position);
+
+        $.ajax({
+            url: ROUTES.registerWithoutPan,
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': CSRF },
+            data: data,
+            processData: false,
+            contentType: false,
+            success: function (res) {
+                try { res = typeof res === 'string' ? JSON.parse(res) : res; } catch(e) {}
+                if (res.status === 'success') {
+                    $('#placeUserModal').modal('hide');
+                    Swal.fire({
+                        title: 'Member Added!',
+                        html: '<div class="text-left mt-2">' +
+                              '<p><strong>User ID:</strong> <span class="text-primary" style="font-size:1.1em;">' + res.connection + '</span></p>' +
+                              '<p><strong>Password:</strong> <span class="text-danger" style="font-size:1.1em;">' + res.password + '</span></p>' +
+                              '</div>',
+                        icon: 'success',
+                        confirmButtonText: 'Close',
+                        allowOutsideClick: false
+                    }).then(reloadPage);
+                } else if (res.status === 'validation') {
+                    let msg = '';
+                    $.each(res.errors, function (k, v) { msg += v[0] + '<br>'; });
+                    Swal.fire({ icon: 'error', title: 'Validation Error', html: msg });
+                    $btn.prop('disabled', false).html('<i class="fas fa-user-plus"></i> Add Member');
+                } else {
+                    Swal.fire('Error', res.message || 'Registration failed.', 'error');
+                    $btn.prop('disabled', false).html('<i class="fas fa-user-plus"></i> Add Member');
+                }
+            },
+            error: function (xhr) {
+                Swal.fire('Error', xhr.responseJSON?.message || 'Something went wrong.', 'error');
+                $btn.prop('disabled', false).html('<i class="fas fa-user-plus"></i> Add Member');
+            }
+        });
+    }
 });
 
 // ── Tree render ───────────────────────────────────────────────────────────────
