@@ -150,8 +150,21 @@
                     {{-- Tab 2: Add new member --}}
                     <div class="tab-pane fade" id="tabNewUser">
                         <p class="text-warning small"><i class="fas fa-info-circle"></i> A new member will be registered and placed in this slot.</p>
+
+                        {{-- Registration type --}}
+                        <div class="d-flex align-items-center mb-3 p-2 bg-light rounded">
+                            <strong class="mr-3 small">Registration type:</strong>
+                            <div class="icheck-primary mr-3">
+                                <input type="radio" id="regTypeWpan" name="reg_type" value="wpan" checked>
+                                <label for="regTypeWpan">Without PAN Card</label>
+                            </div>
+                            <div class="icheck-primary">
+                                <input type="radio" id="regTypeWithPan" name="reg_type" value="withpan">
+                                <label for="regTypeWithPan">With PAN Card</label>
+                            </div>
+                        </div>
+
                         <form id="newUserForm">
-                            <input type="hidden" name="sponsor_id" value="{{ $me->connection }}">
                             <div class="row">
                                 <div class="form-group col-md-6">
                                     <label>Name <span class="text-danger">*</span></label>
@@ -165,9 +178,20 @@
                                     <label>Phone <span class="text-danger">*</span></label>
                                     <input type="text" name="phone_no" class="form-control" maxlength="10" required>
                                 </div>
+                                <div class="form-group col-md-6" id="panCardField" style="display:none;">
+                                    <label>PAN Card <span class="text-danger">*</span></label>
+                                    <input type="text" name="pan_card_no" id="panCardInput" class="form-control"
+                                           oninput="this.value=this.value.toUpperCase()" placeholder="ABCDE1234F">
+                                </div>
                                 <div class="form-group col-md-6">
                                     <label>Pincode <span class="text-danger">*</span></label>
                                     <input type="text" name="pincode" class="form-control" maxlength="6" required>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Sponsor ID <span class="text-danger">*</span></label>
+                                    <input type="text" name="sponsor_id" id="userSponsorIdInput" class="form-control"
+                                           value="{{ $me->connection }}" placeholder="Sponsor connection code" required autocomplete="off">
+                                    <small id="userSponsorNamePreview" class="mt-1 d-block text-success" style="min-height:16px;"></small>
                                 </div>
                                 <div class="form-group col-md-6">
                                     <label>Password <span class="text-danger">*</span></label>
@@ -273,6 +297,8 @@ const ROUTES = {
     checkSlots:         '{{ route("admin.binary_tree.check_slots") }}',
     legVolumeDetail:    '{{ route("admin.binary_tree.leg_volume_detail") }}',
     registerWithoutPan: '{{ route("register.store.wpan") }}',
+    registerWithPan:    '{{ route("register.store") }}',
+    sponsorLookup:      '{{ url("/get_user_name") }}',
 };
 
 const PKG_BADGE_CLASS = { basic_package: 'basic', premium_package: 'premium', prime_package: 'prime' };
@@ -387,6 +413,12 @@ function openPlaceModal(parentId, position) {
     // Reset to first tab
     $('#placeTabs a[href="#tabExisting"]').tab('show');
     $('#newUserForm')[0].reset();
+    // Restore pre-filled sponsor and hide PAN field after reset
+    $('#userSponsorIdInput').val('{{ $me->connection }}');
+    $('#userSponsorNamePreview').text('');
+    $('#panCardField').hide();
+    $('#panCardInput').prop('required', false);
+    $('input[name="reg_type"][value="wpan"]').prop('checked', true);
     $('#placeUserModal').modal('show');
 }
 
@@ -397,6 +429,32 @@ $('#placeTabs a[href="#tabNewUser"]').on('shown.bs.tab', function () {
 $('#placeTabs a[href="#tabExisting"]').on('shown.bs.tab', function () {
     const hasUser = !!$('#selectedUserId').val();
     $('#btnPlaceUser').prop('disabled', !hasUser).html('<i class="fas fa-check"></i> Place');
+});
+
+// PAN card toggle
+$('input[name="reg_type"]').on('change', function () {
+    const withPan = $(this).val() === 'withpan';
+    $('#panCardField').toggle(withPan);
+    $('#panCardInput').prop('required', withPan);
+});
+
+// Sponsor name preview
+let sponsorDebounce;
+$('#userSponsorIdInput').on('input', function () {
+    clearTimeout(sponsorDebounce);
+    const val = $(this).val().trim();
+    if (!val) { $('#userSponsorNamePreview').text(''); return; }
+    sponsorDebounce = setTimeout(function () {
+        $.post(ROUTES.sponsorLookup, { user_name: val, _token: CSRF }, function (res) {
+            if (res && res.name) {
+                $('#userSponsorNamePreview').text('✓ ' + res.name).css('color', '#28a745');
+            } else {
+                $('#userSponsorNamePreview').text('Sponsor not found').css('color', '#dc3545');
+            }
+        }).fail(function () {
+            $('#userSponsorNamePreview').text('');
+        });
+    }, 300);
 });
 
 function togglePwd(fieldId, btn) {
@@ -480,6 +538,10 @@ $('#btnPlaceUser').on('click', function () {
 
     } else {
         // ── Add new member ────────────────────────────────────────────
+        const regType = $('input[name="reg_type"]:checked').val();
+        const usePan  = (regType === 'withpan');
+        $('#panCardInput').prop('required', usePan);
+
         const form = document.getElementById('newUserForm');
         if (!form.checkValidity()) { form.reportValidity(); return; }
 
@@ -488,9 +550,12 @@ $('#btnPlaceUser').on('click', function () {
         const data = new FormData(form);
         data.append('parent_id', parentId);
         data.append('position', position);
+        if (!usePan) data.delete('pan_card_no');
+
+        const registerUrl = usePan ? ROUTES.registerWithPan : ROUTES.registerWithoutPan;
 
         $.ajax({
-            url: ROUTES.registerWithoutPan,
+            url: registerUrl,
             method: 'POST',
             headers: { 'X-CSRF-TOKEN': CSRF },
             data: data,
